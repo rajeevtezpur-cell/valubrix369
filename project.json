@@ -1,0 +1,24 @@
+{
+  "overview": "ValuBrix is an institutional-grade AI-powered property intelligence platform for Bangalore real estate. It delivers premium map visualization with glassmorphic level selectors and 10 infrastructure layer toggles across Buy, Rent, Sell, AI Valuation, and Area Intelligence portals — backed by 10,000+ verified training data points.",
+  "features": [
+    "Premium glassmorphic level selector pills (Smart/Premium/Growth/Investment)",
+    "10 infrastructure layer toggles (Metro, Railway, Bus, Hospital, School, College, Tech Park, Mall, Airport, Highway)",
+    "Multi-layer pin support with animated markers and distance labels",
+    "Bottom-left floating legend card for active layers",
+    "Pin clustering on zoom out, expand on zoom in",
+    "10,000+ verified training data points across North-West, East, and South Bangalore",
+    "Unified AI engines for valuation, rental, and area intelligence",
+    "Strict property type segregation (Apartment/Villa/Plot/Commercial)"
+  ],
+  "category": "real-estate",
+  "tags": [
+    "real-estate",
+    "ai",
+    "bangalore",
+    "property-intelligence",
+    "map",
+    "valuation",
+    "premium-ui"
+  ],
+  "last_updated": "2026-04-11T11:51:30.046Z"
+}

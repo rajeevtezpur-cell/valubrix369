@@ -1,0 +1,402 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type ValuationResponse = 
+ record {
+   bestPrice: nat;
+   breakdown: ValuationBreakdown;
+   confidence: nat;
+   confidenceReason: text;
+   localityFound: bool;
+   priceMax: nat;
+   priceMin: nat;
+ };
+type ValuationReport = 
+ record {
+   confidence: nat;
+   createdAt: Time;
+   estimatedMax: nat;
+   estimatedMin: nat;
+   id: nat;
+   location: text;
+   propertyType: PropertyType;
+   userId: principal;
+ };
+type ValuationBreakdown = 
+ record {
+   comparablesContribution: nat;
+   comparablesUsed: nat;
+   demandContribution: nat;
+   infraContribution: nat;
+   locationContribution: nat;
+   metroContribution: nat;
+   pricePerSqft: nat;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfile = 
+ record {
+   auth_provider: opt text;
+   city: text;
+   email: text;
+   email_hash: opt text;
+   fullName: text;
+   mobile: text;
+   panNumber: text;
+   password_hash: opt text;
+   role: UserRole;
+   subscription_status: text;
+   username: text;
+ };
+type TransformationOutput = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type TransformationInput = 
+ record {
+   context: blob;
+   response: http_request_result;
+ };
+type Time = int;
+type SalesFeedback = 
+ record {
+   actualPrice: nat;
+   locality: text;
+   predictedPrice: nat;
+   timestamp: int;
+ };
+type SaleRecord = 
+ record {
+   locality: text;
+   propertyType: text;
+   soldPrice: nat;
+   sqft: nat;
+   timestamp: int;
+ };
+type ReraProject = 
+ record {
+   builderName: text;
+   dataType: text;
+   locality: text;
+   microLocation: text;
+   possessionDate: text;
+   priceMax: nat;
+   priceMin: nat;
+   projectName: text;
+   propertyType: text;
+   status: text;
+   unitSize: nat;
+ };
+type RentalResponse = 
+ record {
+   avgRent: nat;
+   avgRentPerSqft: nat;
+   rentMax: nat;
+   rentMin: nat;
+   rentalConfidence: nat;
+   vacancyRate: nat;
+   yieldPercent: nat;
+ };
+type PropertyType = 
+ variant {
+   flat;
+   plot;
+   villa;
+ };
+type PropertyListing = 
+ record {
+   badges: vec text;
+   balconies: nat;
+   bhk: nat;
+   builderName: text;
+   buildingAge: nat;
+   builtUpArea: nat;
+   carpetArea: nat;
+   city: text;
+   coveredParking: nat;
+   createdAt: Time;
+   description: text;
+   facing: text;
+   floor: nat;
+   id: nat;
+   landUse: text;
+   legalStatus: text;
+   location: text;
+   mediaBlobs: vec ExternalBlob;
+   openParking: nat;
+   plotArea: nat;
+   plotUnit: text;
+   price: nat;
+   projectName: text;
+   propertyType: PropertyType;
+   reraNumber: text;
+   sellerId: principal;
+   status: ListingStatus;
+   title: text;
+   totalFloors: nat;
+ };
+type PriceSnapshot = 
+ record {
+   confidenceWeight: nat;
+   locality: text;
+   pricePerSqft: nat;
+   source: text;
+   timestamp: int;
+ };
+type MetroInfo = 
+ record {
+   distanceKm: text;
+   hasMetro: bool;
+   metroScore: nat;
+   nearestStation: text;
+ };
+type ManualProjectEntry = 
+ record {
+   locality: text;
+   name: text;
+   submittedAt: int;
+   submittedBy: text;
+ };
+type LocalityIntelligence = 
+ record {
+   amenitiesScore: nat;
+   avgPricePerSqft: nat;
+   city: text;
+   demandScore: nat;
+   growthRate: nat;
+   infraScore: nat;
+   locationScore: nat;
+   name: text;
+   rentalPerSqft: nat;
+   supplyDensity: nat;
+ };
+type ListingStatus = 
+ variant {
+   draft;
+   published;
+ };
+type LeadInput = 
+ record {
+   budget: text;
+   email: text;
+   is_priority: bool;
+   location: text;
+   message: text;
+   name: text;
+   phone: text;
+   service_type: text;
+ };
+type LeadFilter = 
+ record {
+   date_from: opt int;
+   date_to: opt int;
+   service_type: opt text;
+ };
+type Lead = 
+ record {
+   budget: text;
+   created_at: int;
+   email: text;
+   id: text;
+   is_contacted: bool;
+   is_priority: bool;
+   location: text;
+   message: text;
+   name: text;
+   phone: text;
+   service_type: text;
+ };
+type ForecastResponse = 
+ record {
+   aggressive: nat;
+   basePrice: nat;
+   conservative: nat;
+   disclaimer: text;
+   growthRate: nat;
+   realistic: nat;
+ };
+type ExternalBlob = blob;
+type Enquiry = 
+ record {
+   createdAt: Time;
+   id: nat;
+   name: text;
+   phone: text;
+   projectId: text;
+   projectName: text;
+ };
+type DemandSignal = 
+ record {
+   demandScore: nat;
+   locality: text;
+   source: text;
+   timestamp: int;
+ };
+type DealScoreResponse = 
+ record {
+   dealScore: nat;
+   dealTag: text;
+   demandScore: nat;
+   expectedDaysToSell: nat;
+   fairValue: nat;
+   liquidityScore: nat;
+   priceGap: int;
+ };
+type AILearningSubmission = 
+ record {
+   area: float64;
+   date: text;
+   id: nat;
+   locality: text;
+   notes: text;
+   propertyType: text;
+   soldPrice: float64;
+   submittedAt: int;
+ };
+type AILearningInput = 
+ record {
+   area: float64;
+   date: text;
+   locality: text;
+   notes: text;
+   propertyType: text;
+   soldPrice: float64;
+ };
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initializeAccessControl: () -> ();
+  addNewReraProjects: (newProjects: vec ReraProject) -> (bool);
+  addPriceSnapshot: (locality: text, price: nat) -> (text);
+  addValuationReport: (location: text, propertyType: PropertyType,
+   estimatedMin: nat, estimatedMax: nat, confidence: nat) -> (nat);
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  cleanupOldData: (maxAgeDays: nat) -> (text);
+  computeValuation: (locality: text, propertyType: text, sqft: nat, age: 
+   nat, amenitiesCount: nat) -> (ValuationResponse) query;
+  createCheckoutSession: () -> (text);
+  createEnquiry: (projectId: text, projectName: text, name: text, phone:
+   text) -> (nat);
+  createListing: (title: text, propertyType: PropertyType, location: 
+   text, city: text, price: nat, carpetArea: nat, builtUpArea: nat, bhk: 
+   nat, floor: nat, totalFloors: nat, buildingAge: nat, facing: text,
+   coveredParking: nat, openParking: nat, balconies: nat, builderName: 
+   text, projectName: text, reraNumber: text, legalStatus: text, landUse:
+   text, plotArea: nat, plotUnit: text, badges: vec text, mediaBlobs:
+   vec ExternalBlob, description: text) -> (nat);
+  deleteListing: (listingId: nat) -> ();
+  filterListings: (propertyType: PropertyType, minPrice: nat, maxPrice: 
+   nat, bhk: nat) -> (vec PropertyListing) query;
+  getAILearningSubmissions: () -> (vec AILearningSubmission) query;
+  getAllPublishedListings: () -> (vec PropertyListing) query;
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getDealScore: (listingId: nat) -> (DealScoreResponse) query;
+  getDemandSignals: (locality: text) -> (vec DemandSignal) query;
+  getEnquiries: () -> (vec Enquiry) query;
+  getFeedbackCount: () -> (nat) query;
+  getForecast: (locality: text, propertyType: text) ->
+   (ForecastResponse) query;
+  getLeads: (filter: LeadFilter) -> (vec Lead) query;
+  getListingById: (listingId: nat) -> (opt PropertyListing) query;
+  getListingsBySeller: (sellerId: principal) -> (vec PropertyListing) query;
+  getLocalityIntelligence: (locality: text) ->
+   (opt LocalityIntelligence) query;
+  getLocalityList: () -> (vec text) query;
+  getManualProjects: (locality: text) -> (vec ManualProjectEntry) query;
+  getMetroInfo: (locality: text) -> (MetroInfo) query;
+  getPriceHistory: (locality: text) -> (vec PriceSnapshot) query;
+  getRentalIntelligence: (locality: text) -> (RentalResponse) query;
+  getReraProjects: () -> (vec ReraProject) query;
+  getSaleRecords: () -> (vec SaleRecord) query;
+  getSalesFeedbackLog: () -> (vec SalesFeedback) query;
+  getSavedProperties: () -> (vec PropertyListing) query;
+  getStripeSessionStatus: (sessionId: text) -> (text);
+  getUserProfile: (user: principal) -> (opt UserProfile) query;
+  getUserSubscriptionStatus: () -> (text) query;
+  getValuationReportsForUser: (userId: principal) ->
+   (vec ValuationReport) query;
+  isCallerAdmin: () -> (bool) query;
+  isIntelligenceSeeded: () -> (bool) query;
+  isPremiumUser: () -> (bool) query;
+  isStripeConfigured: () -> (bool) query;
+  loginWithEmail: (emailHash: text, passwordHash: text) ->
+   (opt UserProfile) query;
+  markLeadContacted: (leadId: text) -> (bool);
+  publishListing: (listingId: nat) -> ();
+  recordDailySnapshot: (locality: text) -> (text);
+  registerUser: (username: text, fullName: text, mobile: text, email: 
+   text, city: text, panNumber: text) -> ();
+  registerWithEmail: (emailHash: text, passwordHash: text, name: text) ->
+   (text);
+  runValidationTests: () -> (vec text) query;
+  saveAILearningSubmission: (input: AILearningInput) -> (text);
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+  saveProperty: (listingId: nat) -> ();
+  searchListings: (location: text) -> (vec PropertyListing) query;
+  searchLocalities: (searchQuery: text) -> (vec text) query;
+  seedAndRetrain: (newProjects: vec ReraProject) -> (bool);
+  seedIntelligenceData: () -> ();
+  setStripeConfig: (secretKey: text, priceInCents: nat, allowedCountries:
+   vec text) -> ();
+  setStripeConfiguration: (secretKey: text, priceInCents: nat,
+   allowedCountries: vec text) -> ();
+  submitLead: (input: LeadInput) -> (text);
+  submitManualProject: (name: text, locality: text) -> ();
+  submitSaleFeedback: (locality: text, predictedPrice: nat, actualPrice:
+   nat) -> (text);
+  submitSaleRecord: (locality: text, sqft: nat, propertyType: text,
+   soldPrice: nat) -> (text);
+  trackFeedback: (listingId: nat, eventType: text) -> ();
+  transform: (input: TransformationInput) -> (TransformationOutput) query;
+  unsaveProperty: (listingId: nat) -> ();
+  updateConfidence: (locality: text, source: text, actualPrice: nat) ->
+   (text);
+  updateDemandSignals: () -> (text);
+  updateListing: (listingId: nat, title: text, propertyType: PropertyType,
+   location: text, city: text, price: nat, carpetArea: nat, builtUpArea: 
+   nat, bhk: nat, floor: nat, totalFloors: nat, buildingAge: nat, facing:
+   text, coveredParking: nat, openParking: nat, balconies: nat, builderName:
+   text, projectName: text, reraNumber: text, legalStatus: text, landUse:
+   text, plotArea: nat, plotUnit: text, badges: vec text, mediaBlobs:
+   vec ExternalBlob, description: text) -> ();
+  updateReraProject: (key: text, updatedStatus: text, updatedPossessionDate:
+   text, updatedPriceMin: nat, updatedPriceMax: nat) -> (bool);
+  updateSubscriptionStatus: (userId: text, status: text) -> (bool);
+  updateUserRole: (user: principal, role: UserRole) -> ();
+  verifyAndUpgradeFromSession: (sessionId: text) -> (text);
+}

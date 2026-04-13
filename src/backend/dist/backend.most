@@ -1,0 +1,329 @@
+// Version: 1.0.0
+type AILearningSubmission__1062446195 = AILearningSubmission__117392513;
+type AILearningSubmission__117392513 =
+  {
+    area : Float;
+    date : Text;
+    id : Nat;
+    locality : Text;
+    notes : Text;
+    propertyType : Text;
+    soldPrice : Float;
+    submittedAt : Int
+  };
+type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type DemandSignal__977811222 =
+  {demandScore : Nat; locality : Text; source : Text; timestamp : Int};
+type Enquiry__415520819 =
+  {
+    createdAt : Time__900049286;
+    id : Nat;
+    name : Text;
+    phone : Text;
+    projectId : Text;
+    projectName : Text
+  };
+type ExternalBlob__246066408 = Blob;
+type FeedbackEvent__1033869704 =
+  {eventType : Text; listingId : Nat; timestamp : Time__900049286};
+type Int__270357528 = Int__616954475;
+type Int__616954475 = Int;
+type Internal__667636161<T> =
+  {children : [var ?Node__92254746<T>]; data : Data__159895909<T>};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Lead__21276013 =
+  {
+    budget : Text;
+    created_at : Int;
+    email : Text;
+    id : Text;
+    is_contacted : Bool;
+    is_priority : Bool;
+    location : Text;
+    message : Text;
+    name : Text;
+    phone : Text;
+    service_type : Text
+  };
+type Leaf__520550824<T> = {data : Data__159895909<T>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type ListingStatus__169420352 = {#draft; #published};
+type LocalityIntelligence__1066717693 =
+  {
+    amenitiesScore : Nat;
+    avgPricePerSqft : Nat;
+    city : Text;
+    demandScore : Nat;
+    growthRate : Nat;
+    infraScore : Nat;
+    locationScore : Nat;
+    name : Text;
+    rentalPerSqft : Nat;
+    supplyDensity : Nat
+  };
+type ManualProjectEntry__507281138 =
+  {locality : Text; name : Text; submittedAt : Int; submittedBy : Text};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type MetroProximity__273732928 = {distanceKm10 : Nat; nearestStation : Text};
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type Node__92254746<T> =
+  {#internal : Internal__667636161<T>; #leaf : Leaf__520550824<T>};
+type PriceSnapshot__635036524 =
+  {
+    confidenceWeight : Nat;
+    locality : Text;
+    pricePerSqft : Nat;
+    source : Text;
+    timestamp : Int
+  };
+type PropertyListing__248911652 =
+  {
+    badges : [Text];
+    balconies : Nat;
+    bhk : Nat;
+    builderName : Text;
+    buildingAge : Nat;
+    builtUpArea : Nat;
+    carpetArea : Nat;
+    city : Text;
+    coveredParking : Nat;
+    createdAt : Time__900049286;
+    description : Text;
+    facing : Text;
+    floor : Nat;
+    id : Nat;
+    landUse : Text;
+    legalStatus : Text;
+    location : Text;
+    mediaBlobs : [ExternalBlob__246066408];
+    openParking : Nat;
+    plotArea : Nat;
+    plotUnit : Text;
+    price : Nat;
+    projectName : Text;
+    propertyType : PropertyType__136276502;
+    reraNumber : Text;
+    sellerId : Principal;
+    status : ListingStatus__169420352;
+    title : Text;
+    totalFloors : Nat
+  };
+type PropertyType__136276502 = {#flat; #plot; #villa};
+type ReraProject__880244734 =
+  {
+    builderName : Text;
+    dataType : Text;
+    locality : Text;
+    microLocation : Text;
+    possessionDate : Text;
+    priceMax : Nat;
+    priceMin : Nat;
+    projectName : Text;
+    propertyType : Text;
+    status : Text;
+    unitSize : Nat
+  };
+type SaleRecord__284146633 =
+  {
+    locality : Text;
+    propertyType : Text;
+    soldPrice : Nat;
+    sqft : Nat;
+    timestamp : Int
+  };
+type SalesFeedback__517544124 =
+  {actualPrice : Nat; locality : Text; predictedPrice : Nat; timestamp : Int};
+type StripeConfig__115007845 =
+  {allowedCountries : [Text]; priceInCents : Nat; secretKey : Text};
+type Time__796480547 = Int__270357528;
+type Time__900049286 = Time__796480547;
+type UserProfile__491224006 =
+  {
+    auth_provider : ?Text;
+    city : Text;
+    email : Text;
+    email_hash : ?Text;
+    fullName : Text;
+    mobile : Text;
+    panNumber : Text;
+    password_hash : ?Text;
+    role : UserRole__599675725;
+    subscription_status : Text;
+    username : Text
+  };
+type UserRole__1054455867 = {#admin; #guest; #user};
+type UserRole__599675725 = UserRole__1054455867;
+type ValuationReport__964020580 =
+  {
+    confidence : Nat;
+    createdAt : Time__900049286;
+    estimatedMax : Nat;
+    estimatedMin : Nat;
+    id : Nat;
+    location : Text;
+    propertyType : PropertyType__136276502;
+    userId : Principal
+  };
+type _MigAreaIntelligence__815566601 =
+  {
+    activeProjects : Nat;
+    avgPricePerSqft : Nat;
+    city : Text;
+    demandTier : _MigDemandTier__452077668;
+    locality : Text;
+    yoyTrendPercent : Int
+  };
+type _MigDemandTier__452077668 = {#high; #low; #medium};
+type _MigListing__2923199 =
+  {
+    amenities : [Text];
+    areaSqft : Nat;
+    bathrooms : Nat;
+    bedrooms : Nat;
+    builderName : Text;
+    city : Text;
+    createdAt : Int;
+    description : Text;
+    id : Text;
+    imageBlobIds : [Text];
+    isActive : Bool;
+    locality : Text;
+    priceInr : Nat;
+    projectName : Text;
+    propertyType : _MigPropertyType__175467536;
+    reraNumber : Text;
+    seller : Principal;
+    stage : _MigStage__842096362;
+    title : Text
+  };
+type _MigProjectDatasetEntry__728336589 =
+  {
+    areaSqftMax : Nat;
+    areaSqftMin : Nat;
+    builder : Text;
+    city : Text;
+    locality : Text;
+    priceMax : Nat;
+    priceMin : Nat;
+    projectName : Text;
+    propertyType : _MigPropertyType__175467536;
+    reraNumber : Text;
+    stage : _MigStage__842096362
+  };
+type _MigPropertyType__175467536 = {#bhk1; #bhk2; #bhk3; #plot; #villa};
+type _MigStage__842096362 = {#prelaunch; #ready; #underConstruction};
+type _MigUserProfile__578695977 =
+  {email : ?Text; name : Text; phone : ?Text; role : Text};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable aiLearningState :
+    {
+      var aiLearningIdCounter : Nat;
+      var aiLearningSubmissions : [AILearningSubmission__1062446195]
+    };
+  stable var areaIntelligenceData :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?_MigAreaIntelligence__815566601]];
+      var elementIndex : Nat__490723111
+    };
+  stable cities :
+    {var root : Node__92254746<Text>; var size : Nat__490723111};
+  stable demandSignalsStore :
+    {
+      var root : Node__46230540<Text, [DemandSignal__977811222]>;
+      var size : Nat__490723111
+    };
+  stable emailProfiles :
+    {
+      var root : Node__46230540<Text, UserProfile__491224006>;
+      var size : Nat__490723111
+    };
+  stable enquiries :
+    {
+      var root : Node__46230540<Nat, Enquiry__415520819>;
+      var size : Nat__490723111
+    };
+  stable var feedbackEvents : [FeedbackEvent__1033869704];
+  stable var intelligenceSeeded : Bool;
+  stable var lastDemandUpdate : Int;
+  stable var leadIdCounter : Nat;
+  stable leadsStore :
+    {
+      var root : Node__46230540<Text, Lead__21276013>;
+      var size : Nat__490723111
+    };
+  stable listings :
+    {
+      var root : Node__46230540<Text, _MigListing__2923199>;
+      var size : Nat__490723111
+    };
+  stable localityData :
+    {
+      var root : Node__46230540<Text, LocalityIntelligence__1066717693>;
+      var size : Nat__490723111
+    };
+  stable localityPriceHistory :
+    {
+      var root : Node__46230540<Text, [PriceSnapshot__635036524]>;
+      var size : Nat__490723111
+    };
+  stable manualProjectEntries :
+    {
+      var root : Node__46230540<Text, [ManualProjectEntry__507281138]>;
+      var size : Nat__490723111
+    };
+  stable metroProximityData :
+    {
+      var root : Node__46230540<Text, MetroProximity__273732928>;
+      var size : Nat__490723111
+    };
+  stable var nextEnquiryId : Nat;
+  stable var nextListingId : Nat;
+  stable var nextReportId : Nat;
+  stable var projectDataset :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?_MigProjectDatasetEntry__728336589]];
+      var elementIndex : Nat__490723111
+    };
+  stable propertyListings :
+    {
+      var root : Node__46230540<Nat, PropertyListing__248911652>;
+      var size : Nat__490723111
+    };
+  stable var saleRecordsLog : [SaleRecord__284146633];
+  stable var salesFeedbackLog : [SalesFeedback__517544124];
+  stable savedProperties :
+    {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
+  stable var stableReraProjects : [ReraProject__880244734];
+  stable var stripeConfig : ?StripeConfig__115007845;
+  stable userProfiles :
+    {
+      var root : Node__46230540<Principal, _MigUserProfile__578695977>;
+      var size : Nat__490723111
+    };
+  stable users :
+    {
+      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var size : Nat__490723111
+    };
+  stable valuationReports :
+    {
+      var root : Node__46230540<Nat, ValuationReport__964020580>;
+      var size : Nat__490723111
+    }
+};

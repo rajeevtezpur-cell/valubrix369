@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    /* Deep navy dark theme — always on */
+    --background: 0.13 0.025 245;
+    --foreground: 0.95 0.005 240;
+    --card: 0.17 0.028 245;
+    --card-foreground: 0.95 0.005 240;
+    --popover: 0.19 0.030 245;
+    --popover-foreground: 0.95 0.005 240;
+    /* Vibrant teal primary */
+    --primary: 0.76 0.14 192;
+    --primary-foreground: 0.10 0.02 245;
+    --secondary: 0.22 0.030 245;
+    --secondary-foreground: 0.85 0.01 240;
+    --muted: 0.20 0.025 245;
+    --muted-foreground: 0.58 0.02 240;
+    --accent: 0.25 0.04 245;
+    --accent-foreground: 0.90 0.005 240;
+    --destructive: 0.65 0.22 25;
+    --destructive-foreground: 0.97 0 0;
+    --border: 0.28 0.03 245;
+    --input: 0.24 0.03 245;
+    --ring: 0.76 0.14 192;
+    --chart-1: 0.76 0.14 192;
+    --chart-2: 0.70 0.17 162;
+    --chart-3: 0.75 0.18 84;
+    --chart-4: 0.72 0.20 303;
+    --chart-5: 0.65 0.22 25;
+    --sidebar: 0.15 0.026 245;
+    --sidebar-foreground: 0.95 0.005 240;
+    --sidebar-primary: 0.76 0.14 192;
+    --sidebar-primary-foreground: 0.10 0.02 245;
+    --sidebar-accent: 0.22 0.030 245;
+    --sidebar-accent-foreground: 0.90 0.005 240;
+    --sidebar-border: 0.28 0.03 245;
+    --sidebar-ring: 0.76 0.14 192;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer utilities {
+  .teal-glow {
+    box-shadow: 0 0 20px oklch(0.76 0.14 192 / 0.25);
+  }
+  .card-glass {
+    background: oklch(0.17 0.028 245 / 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(0.28 0.03 245 / 0.7);
+  }
+  .nav-glass {
+    background: oklch(0.14 0.025 245 / 0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid oklch(0.28 0.03 245 / 0.5);
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, oklch(0.76 0.14 192), oklch(0.82 0.12 165));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
