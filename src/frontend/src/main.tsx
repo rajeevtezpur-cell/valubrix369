@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { initializePSFLearning } from "./engines/psfLearningEngine";
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
@@ -13,6 +14,12 @@ declare global {
     toJSON(): string;
   }
 }
+
+// Initialize PSF learning engine on app startup (non-blocking, runs in background)
+// 1s delay ensures it doesn't block first render
+setTimeout(() => {
+  initializePSFLearning();
+}, 1000);
 
 const queryClient = new QueryClient();
 

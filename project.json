@@ -1,24 +1,25 @@
 {
-  "overview": "ValuBrix is an institutional-grade AI-powered property intelligence platform for Bangalore real estate. It delivers premium map visualization with glassmorphic level selectors and 10 infrastructure layer toggles across Buy, Rent, Sell, AI Valuation, and Area Intelligence portals — backed by 10,000+ verified training data points.",
+  "overview": "ValuBrix is a premium AI-powered property intelligence platform for Bangalore real estate, delivering accurate valuations, area intelligence, distance/POI analysis, and specialized portals for buyers, sellers, and bankers — all powered by a dataset-trained engine with no hardcoded values.",
   "features": [
-    "Premium glassmorphic level selector pills (Smart/Premium/Growth/Investment)",
-    "10 infrastructure layer toggles (Metro, Railway, Bus, Hospital, School, College, Tech Park, Mall, Airport, Highway)",
-    "Multi-layer pin support with animated markers and distance labels",
-    "Bottom-left floating legend card for active layers",
-    "Pin clustering on zoom out, expand on zoom in",
-    "10,000+ verified training data points across North-West, East, and South Bangalore",
-    "Unified AI engines for valuation, rental, and area intelligence",
-    "Strict property type segregation (Apartment/Villa/Plot/Commercial)"
+    "Dataset-driven AI valuation engine with 19,200+ records",
+    "Separate ML models per property type (Apartment/Villa/Plot/Commercial)",
+    "Builder premium multiplier wired to final valuation",
+    "Correct PSF for all Bangalore micro-locations including outer periphery",
+    "Area Intelligence with pollution layer (AQI/PM2.5/PM10)",
+    "Priority-based distance loading with OSRM routing",
+    "No POI result limits — all amenities within radius shown",
+    "PSF audit panel for transparency",
+    "Continuous learning every 50 new records",
+    "WhatsApp lead form on all pages",
+    "Single core engine across all 8 portals"
   ],
-  "category": "real-estate",
+  "category": "real-estate-technology",
   "tags": [
     "real-estate",
-    "ai",
+    "ai-valuation",
     "bangalore",
     "property-intelligence",
-    "map",
-    "valuation",
-    "premium-ui"
+    "machine-learning"
   ],
-  "last_updated": "2026-04-11T11:51:30.046Z"
+  "last_updated": "2026-04-15T12:40:34.455Z"
 }

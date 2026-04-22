@@ -16,16 +16,47 @@ interface WhatsAppLeadFormProps {
   serviceType?: ServiceType;
 }
 
-const SERVICE_LABELS: Record<ServiceType, string> = {
-  buy: "Buy Property",
-  sell: "Sell Property",
-  rent: "Rent Property",
-  investment: "Investment",
-  interior: "Interior Design",
-  general: "General Enquiry",
-};
-
 const WA_NUMBER = "917259416508";
+
+const CITY_OPTIONS = [
+  "Bangalore",
+  "Mumbai",
+  "Pune",
+  "Hyderabad",
+  "Chennai",
+  "Delhi",
+  "Others",
+];
+
+const BUDGET_OPTIONS = [
+  "₹30-50L",
+  "₹50-75L",
+  "₹75L-1Cr",
+  "₹1-1.5Cr",
+  "₹1.5-2Cr",
+  "₹2-3Cr",
+  "₹3-5Cr",
+  "₹5Cr+",
+];
+
+const SERVICE_OPTIONS = [
+  "Buy Property",
+  "Sell Property",
+  "Rent Property",
+  "Lease Commercial",
+  "Interior Design",
+  "Property Valuation",
+  "Investment Advisory",
+];
+
+const PROPERTY_TYPE_OPTIONS = [
+  "Apartment",
+  "Villa",
+  "Plot",
+  "Commercial",
+  "Office",
+  "Land",
+];
 
 const INPUT_STYLE = {
   background: "rgba(255,255,255,0.05)",
@@ -35,6 +66,14 @@ const INPUT_STYLE = {
 const INPUT_FOCUS = "rgba(212,175,55,0.5)";
 const INPUT_BLUR = "rgba(255,255,255,0.08)";
 const INPUT_ERROR = "rgba(239,68,68,0.6)";
+
+const SELECT_STYLE: React.CSSProperties = {
+  background: "rgba(17,24,39,0.95)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  color: "#fff",
+  appearance: "none" as const,
+  WebkitAppearance: "none" as const,
+};
 
 function saveLead(lead: Record<string, string | boolean>) {
   try {
@@ -92,33 +131,44 @@ export default function WhatsAppLeadForm({
 
   const [form, setForm] = useState({
     name: "",
-    phone: "",
-    location: "",
+    mobile: "",
+    city: "",
     email: "",
     budget: "",
-    message: "",
-    priority_callback: false,
+    service: "",
+    propertyType: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
+  // Pre-fill from user context
   useEffect(() => {
     if (user) {
       setForm((prev) => ({
         ...prev,
         name: user.fullName || prev.name,
         email: user.email || prev.email,
-        phone: user.mobile || prev.phone,
+        mobile: user.mobile || prev.mobile,
       }));
     }
   }, [user]);
 
+  // Pre-select service based on serviceType prop
   useEffect(() => {
-    if (isOpen) {
-      setErrors({});
-      setSubmitting(false);
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    setErrors({});
+    setSubmitting(false);
+    const serviceMap: Record<ServiceType, string> = {
+      buy: "Buy Property",
+      sell: "Sell Property",
+      rent: "Rent Property",
+      investment: "Investment Advisory",
+      interior: "Interior Design",
+      general: "",
+    };
+    const preSelected = serviceMap[serviceType] || "";
+    setForm((prev) => ({ ...prev, service: prev.service || preSelected }));
+  }, [isOpen, serviceType]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -134,15 +184,17 @@ export default function WhatsAppLeadForm({
   function validate() {
     const next: Record<string, string> = {};
     if (!form.name.trim()) next.name = "Name is required";
-    if (!form.phone.trim()) next.phone = "Phone is required";
-    else if (!/^\d{10}$/.test(form.phone.replace(/\s/g, "")))
-      next.phone = "Enter a valid 10-digit mobile number";
-    if (!form.location.trim()) next.location = "Location is required";
+    if (!form.mobile.trim()) next.mobile = "Mobile number is required";
+    else if (!/^\d{10}$/.test(form.mobile.replace(/\s/g, "")))
+      next.mobile = "Enter a valid 10-digit mobile number";
+    if (!form.city) next.city = "City is required";
     return next;
   }
 
   function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
   ) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -167,29 +219,26 @@ export default function WhatsAppLeadForm({
 
     saveLead({
       name: form.name,
-      phone: form.phone,
-      location: form.location,
+      mobile: form.mobile,
+      city: form.city,
       email: form.email,
       budget: form.budget,
-      message: form.message,
+      service: form.service,
+      propertyType: form.propertyType,
       service_type: serviceType,
-      priority_callback: form.priority_callback,
     });
 
-    const serviceLabel = SERVICE_LABELS[serviceType];
-    const lines = [
-      `Hi, I'm interested in *${serviceLabel}*`,
-      "",
-      `Name: ${form.name}`,
-      `Location: ${form.location}`,
-      `Phone: +91 ${form.phone}`,
-      form.email ? `Email: ${form.email}` : null,
+    const msgLines = [
+      `Hi, I'm ${form.name}.`,
+      `City: ${form.city}`,
       form.budget ? `Budget: ${form.budget}` : null,
-      form.message ? `\nMessage: ${form.message}` : null,
-      form.priority_callback ? "\n⚡ Priority Callback Requested" : null,
+      form.service ? `Service: ${form.service}` : null,
+      form.propertyType ? `Type: ${form.propertyType}` : null,
+      `Mobile: ${form.mobile}`,
+      form.email ? `Email: ${form.email}` : null,
     ].filter(Boolean);
 
-    const encoded = encodeURIComponent(lines.join("\n"));
+    const encoded = encodeURIComponent(msgLines.join("\n"));
     window.open(`https://wa.me/${WA_NUMBER}?text=${encoded}`, "_blank");
     setSubmitting(false);
     onClose();
@@ -215,7 +264,7 @@ export default function WhatsAppLeadForm({
         open
         aria-modal="true"
         aria-label="Connect via WhatsApp"
-        className="relative w-full max-w-md rounded-2xl border overflow-hidden m-0 p-0"
+        className="relative w-full max-w-md rounded-2xl border overflow-hidden m-0 p-0 max-h-[90vh] overflow-y-auto"
         style={{
           background:
             "linear-gradient(135deg, rgba(17,24,39,0.98) 0%, rgba(15,23,42,0.98) 100%)",
@@ -226,8 +275,11 @@ export default function WhatsAppLeadForm({
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-5 py-4 border-b"
-          style={{ borderColor: "rgba(255,255,255,0.06)" }}
+          className="flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10"
+          style={{
+            borderColor: "rgba(255,255,255,0.06)",
+            background: "rgba(17,24,39,0.98)",
+          }}
         >
           <div className="flex items-center gap-2.5">
             <span
@@ -253,7 +305,7 @@ export default function WhatsAppLeadForm({
                 Talk to an Expert
               </p>
               <p className="text-xs" style={{ color: "#6B7280" }}>
-                {SERVICE_LABELS[serviceType]}
+                We'll connect you on WhatsApp
               </p>
             </div>
           </div>
@@ -263,7 +315,7 @@ export default function WhatsAppLeadForm({
             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
             style={{ background: "rgba(255,255,255,0.06)" }}
             aria-label="Close"
-            data-ocid="wa-lead-form.close"
+            data-ocid="wa-lead-form.close_button"
           >
             <X size={14} className="text-white/60" />
           </button>
@@ -275,6 +327,7 @@ export default function WhatsAppLeadForm({
           className="px-5 py-5 space-y-3.5"
           noValidate
         >
+          {/* 1. Name */}
           <InputField
             id="wa-name"
             label="Full Name"
@@ -298,7 +351,13 @@ export default function WhatsAppLeadForm({
             />
           </InputField>
 
-          <InputField id="wa-phone" label="Phone" required error={errors.phone}>
+          {/* 2. Mobile Number */}
+          <InputField
+            id="wa-mobile"
+            label="Mobile Number"
+            required
+            error={errors.mobile}
+          >
             <div className="flex gap-2">
               <span
                 className="flex items-center px-3 rounded-lg text-sm text-white/50 flex-shrink-0"
@@ -310,9 +369,9 @@ export default function WhatsAppLeadForm({
                 🇮🇳 +91
               </span>
               <input
-                id="wa-phone"
-                name="phone"
-                value={form.phone}
+                id="wa-mobile"
+                name="mobile"
+                value={form.mobile}
                 onChange={handleChange}
                 placeholder="10-digit mobile"
                 inputMode="numeric"
@@ -320,169 +379,152 @@ export default function WhatsAppLeadForm({
                 className="flex-1 rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none transition-colors"
                 style={{
                   ...INPUT_STYLE,
-                  borderColor: errors.phone ? INPUT_ERROR : INPUT_BLUR,
+                  borderColor: errors.mobile ? INPUT_ERROR : INPUT_BLUR,
                 }}
                 onFocus={(e) => setBorderFocus(e.currentTarget)}
-                onBlur={(e) => setBorderBlur(e.currentTarget, !!errors.phone)}
-                data-ocid="wa-lead-form.phone"
+                onBlur={(e) => setBorderBlur(e.currentTarget, !!errors.mobile)}
+                data-ocid="wa-lead-form.mobile"
               />
             </div>
           </InputField>
 
-          <InputField
-            id="wa-location"
-            label="Location"
-            required
-            error={errors.location}
-          >
+          {/* 3. City */}
+          <InputField id="wa-city" label="City" required error={errors.city}>
+            <div className="relative">
+              <select
+                id="wa-city"
+                name="city"
+                value={form.city}
+                onChange={handleChange}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors pr-8"
+                style={{
+                  ...SELECT_STYLE,
+                  borderColor: errors.city ? INPUT_ERROR : INPUT_BLUR,
+                }}
+                onFocus={(e) => setBorderFocus(e.currentTarget)}
+                onBlur={(e) => setBorderBlur(e.currentTarget, !!errors.city)}
+                data-ocid="wa-lead-form.city"
+              >
+                <option value="" disabled style={{ background: "#111827" }}>
+                  Select city
+                </option>
+                {CITY_OPTIONS.map((c) => (
+                  <option key={c} value={c} style={{ background: "#111827" }}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-xs">
+                ▼
+              </span>
+            </div>
+          </InputField>
+
+          {/* 4. Email (optional) */}
+          <InputField id="wa-email" label="Email">
             <input
-              id="wa-location"
-              name="location"
-              value={form.location}
+              id="wa-email"
+              name="email"
+              type="email"
+              value={form.email}
               onChange={handleChange}
-              placeholder="Area / city you're interested in"
+              placeholder="you@email.com"
               className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none transition-colors"
-              style={{
-                ...INPUT_STYLE,
-                borderColor: errors.location ? INPUT_ERROR : INPUT_BLUR,
-              }}
+              style={{ ...INPUT_STYLE }}
               onFocus={(e) => setBorderFocus(e.currentTarget)}
-              onBlur={(e) => setBorderBlur(e.currentTarget, !!errors.location)}
-              data-ocid="wa-lead-form.location"
+              onBlur={(e) => setBorderBlur(e.currentTarget, false)}
+              data-ocid="wa-lead-form.email"
             />
           </InputField>
 
-          <div className="grid grid-cols-2 gap-3">
-            <InputField id="wa-email" label="Email">
-              <input
-                id="wa-email"
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="you@email.com"
-                className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none transition-colors"
-                style={{ ...INPUT_STYLE }}
-                onFocus={(e) => setBorderFocus(e.currentTarget)}
-                onBlur={(e) => setBorderBlur(e.currentTarget, false)}
-                data-ocid="wa-lead-form.email"
-              />
-            </InputField>
-            <InputField id="wa-budget" label="Budget">
-              <input
+          {/* 5. Budget Range */}
+          <InputField id="wa-budget" label="Budget Range">
+            <div className="relative">
+              <select
                 id="wa-budget"
                 name="budget"
                 value={form.budget}
                 onChange={handleChange}
-                placeholder="e.g. ₹80L – 1.2 Cr"
-                className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none transition-colors"
-                style={{ ...INPUT_STYLE }}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors pr-8"
+                style={{ ...SELECT_STYLE }}
                 onFocus={(e) => setBorderFocus(e.currentTarget)}
                 onBlur={(e) => setBorderBlur(e.currentTarget, false)}
                 data-ocid="wa-lead-form.budget"
-              />
-            </InputField>
-          </div>
-
-          {/* Service type display */}
-          <div>
-            <p className="block text-xs font-medium text-white/60 mb-1">
-              Service
-            </p>
-            <div
-              className="w-full rounded-lg px-3 py-2.5 text-sm flex items-center gap-2"
-              style={{
-                background: "rgba(212,175,55,0.06)",
-                border: "1px solid rgba(212,175,55,0.2)",
-              }}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: "#D4AF37" }}
-              />
-              <span style={{ color: "#D4AF37" }}>
-                {SERVICE_LABELS[serviceType]}
+              >
+                <option value="" style={{ background: "#111827" }}>
+                  Select budget range
+                </option>
+                {BUDGET_OPTIONS.map((b) => (
+                  <option key={b} value={b} style={{ background: "#111827" }}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-xs">
+                ▼
               </span>
             </div>
-          </div>
-
-          <InputField id="wa-message" label="Message">
-            <textarea
-              id="wa-message"
-              name="message"
-              value={form.message}
-              onChange={handleChange}
-              placeholder="Any specific requirements or questions..."
-              rows={2}
-              className="w-full rounded-lg px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none transition-colors resize-none"
-              style={{ ...INPUT_STYLE }}
-              onFocus={(e) => setBorderFocus(e.currentTarget)}
-              onBlur={(e) => setBorderBlur(e.currentTarget, false)}
-              data-ocid="wa-lead-form.message"
-            />
           </InputField>
 
-          {/* Priority toggle */}
-          <button
-            type="button"
-            onClick={() =>
-              setForm((p) => ({
-                ...p,
-                priority_callback: !p.priority_callback,
-              }))
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ")
-                setForm((p) => ({
-                  ...p,
-                  priority_callback: !p.priority_callback,
-                }));
-            }}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors text-left"
-            style={{
-              background: form.priority_callback
-                ? "rgba(212,175,55,0.08)"
-                : "rgba(255,255,255,0.03)",
-              border: form.priority_callback
-                ? "1px solid rgba(212,175,55,0.3)"
-                : "1px solid rgba(255,255,255,0.07)",
-            }}
-            data-ocid="wa-lead-form.priority-toggle"
-          >
-            <span
-              className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors"
-              style={{
-                background: form.priority_callback ? "#D4AF37" : "transparent",
-                borderColor: form.priority_callback
-                  ? "#D4AF37"
-                  : "rgba(255,255,255,0.25)",
-              }}
-            >
-              {form.priority_callback && (
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M2 5l2.5 2.5L8 3"
-                    stroke="#0F172A"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-            </span>
-            <span className="text-xs text-white/70">
-              ⚡ Request Expert Callback —{" "}
-              <span style={{ color: "#D4AF37" }}>mark as priority</span>
-            </span>
-          </button>
+          {/* 6. Service Required */}
+          <InputField id="wa-service" label="Service Required">
+            <div className="relative">
+              <select
+                id="wa-service"
+                name="service"
+                value={form.service}
+                onChange={handleChange}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors pr-8"
+                style={{ ...SELECT_STYLE }}
+                onFocus={(e) => setBorderFocus(e.currentTarget)}
+                onBlur={(e) => setBorderBlur(e.currentTarget, false)}
+                data-ocid="wa-lead-form.service"
+              >
+                <option value="" style={{ background: "#111827" }}>
+                  Select service
+                </option>
+                {SERVICE_OPTIONS.map((s) => (
+                  <option key={s} value={s} style={{ background: "#111827" }}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-xs">
+                ▼
+              </span>
+            </div>
+          </InputField>
 
-          {/* Submit */}
+          {/* 7. Property Type */}
+          <InputField id="wa-property-type" label="Property Type">
+            <div className="relative">
+              <select
+                id="wa-property-type"
+                name="propertyType"
+                value={form.propertyType}
+                onChange={handleChange}
+                className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-colors pr-8"
+                style={{ ...SELECT_STYLE }}
+                onFocus={(e) => setBorderFocus(e.currentTarget)}
+                onBlur={(e) => setBorderBlur(e.currentTarget, false)}
+                data-ocid="wa-lead-form.property_type"
+              >
+                <option value="" style={{ background: "#111827" }}>
+                  Select property type
+                </option>
+                {PROPERTY_TYPE_OPTIONS.map((p) => (
+                  <option key={p} value={p} style={{ background: "#111827" }}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-xs">
+                ▼
+              </span>
+            </div>
+          </InputField>
+
+          {/* Submit — "Send to WhatsApp" */}
           <button
             type="submit"
             disabled={submitting}
@@ -496,7 +538,7 @@ export default function WhatsAppLeadForm({
               (e.currentTarget as HTMLButtonElement).style.background =
                 "#25D366";
             }}
-            data-ocid="wa-lead-form.submit"
+            data-ocid="wa-lead-form.submit_button"
           >
             <svg
               width="16"
@@ -508,7 +550,7 @@ export default function WhatsAppLeadForm({
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
               <path d="M12 0C5.373 0 0 5.373 0 12c0 2.106.547 4.084 1.505 5.812L0 24l6.335-1.49A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818c-1.844 0-3.569-.497-5.054-1.362l-.362-.213-3.76.885.941-3.658-.235-.375A9.818 9.818 0 012.182 12c0-5.41 4.408-9.818 9.818-9.818 5.41 0 9.818 4.408 9.818 9.818 0 5.41-4.408 9.818-9.818 9.818z" />
             </svg>
-            {submitting ? "Sending…" : "Send via WhatsApp"}
+            {submitting ? "Sending…" : "Send to WhatsApp"}
           </button>
         </form>
       </dialog>

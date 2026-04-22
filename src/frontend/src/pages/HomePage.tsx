@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import {
   Building2,
   Home,
@@ -10,10 +11,10 @@ import {
 import BookAppointment from "../components/BookAppointment";
 import FeatureCards from "../components/FeatureCards";
 import Footer from "../components/Footer";
+import GlobalNav from "../components/GlobalNav";
 import GuestLimitModal from "../components/GuestLimitModal";
 import HeroSection from "../components/HeroSection";
 import MissionVision from "../components/MissionVision";
-import Navbar from "../components/Navbar";
 import OurPromise from "../components/OurPromise";
 import PortalEntryCards from "../components/PortalEntryCards";
 import PriceForecastPreview from "../components/PriceForecastPreview";
@@ -24,6 +25,7 @@ import StatsCounter from "../components/StatsCounter";
 import TrustCard from "../components/TrustCard";
 import WhatsAppHero from "../components/WhatsAppHero";
 import WhyValuBrix from "../components/WhyValuBrix";
+import { useAuth } from "../context/AuthContext";
 import { useGuestLimit } from "../hooks/useGuestLimit";
 
 const portalValues = [
@@ -62,15 +64,251 @@ const portalValues = [
   },
 ];
 
+const ROLE_PILLS = [
+  {
+    id: "buyer" as const,
+    label: "Buyer",
+    emoji: "🏡",
+    gradient: "linear-gradient(135deg, #D4AF37, #F6D77A)",
+    glow: "0 0 16px rgba(212,175,55,0.35)",
+    textColor: "#1a1a1a",
+    border: "rgba(212,175,55,0.5)",
+    route: "/buyer",
+  },
+  {
+    id: "seller" as const,
+    label: "Seller",
+    emoji: "🏢",
+    gradient: "linear-gradient(135deg, #10B981, #34D399)",
+    glow: "0 0 16px rgba(16,185,129,0.35)",
+    textColor: "#fff",
+    border: "rgba(16,185,129,0.5)",
+    route: "/seller",
+  },
+  {
+    id: "banker" as const,
+    label: "Banker",
+    emoji: "🏦",
+    gradient: "linear-gradient(135deg, #3B82F6, #60A5FA)",
+    glow: "0 0 16px rgba(59,130,246,0.35)",
+    textColor: "#fff",
+    border: "rgba(59,130,246,0.5)",
+    route: "/bank",
+  },
+  {
+    id: "admin" as const,
+    label: "Admin",
+    emoji: "🔴",
+    gradient: "linear-gradient(135deg, #EF4444, #F87171)",
+    glow: "0 0 16px rgba(239,68,68,0.35)",
+    textColor: "#fff",
+    border: "rgba(239,68,68,0.5)",
+    route: "/admin/dashboard",
+  },
+  {
+    id: "guest" as const,
+    label: "Guest",
+    emoji: "👤",
+    gradient: "linear-gradient(135deg, #374151, #6B7280)",
+    glow: "0 0 10px rgba(107,114,128,0.25)",
+    textColor: "#e5e7eb",
+    border: "rgba(107,114,128,0.4)",
+    route: "/",
+  },
+];
+
 export default function HomePage() {
   const { checkUsage, isLimitReached, dismissLimit } = useGuestLimit();
+  const { user, setUserRole, openLoginModal } = useAuth();
+  const navigate = useNavigate();
+
+  const handleRolePillClick = (pill: (typeof ROLE_PILLS)[number]) => {
+    if (pill.id === "guest") return;
+    if (pill.id === "admin") {
+      if (user && (user.role === "admin" || user.role === "tester")) {
+        navigate({ to: "/admin/dashboard" });
+      } else {
+        openLoginModal();
+      }
+      return;
+    }
+    const roleId = pill.id as "buyer" | "seller" | "banker";
+    if (user) {
+      setUserRole(roleId);
+      navigate({ to: pill.route as "/" });
+    } else {
+      openLoginModal(roleId);
+    }
+  };
 
   return (
     <div id="home" style={{ background: "#0A0F1E", minHeight: "100vh" }}>
-      <Navbar />
+      <GlobalNav />
       <main>
         <WhatsAppHero serviceType="general" />
         <HeroSection onSearch={checkUsage} />
+
+        {/* ── PART 10: Role Pills Below Hero ───────────────────────────────── */}
+        <section
+          style={{
+            background: "rgba(10,15,30,0.95)",
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+            borderBottom: "1px solid rgba(255,255,255,0.05)",
+            padding: "32px 16px",
+          }}
+        >
+          <div className="max-w-3xl mx-auto">
+            <p
+              className="text-center text-xs font-bold uppercase tracking-widest mb-5"
+              style={{ color: "rgba(185,198,216,0.45)" }}
+            >
+              I&apos;m looking as
+            </p>
+            <div
+              className="flex flex-wrap items-center justify-center gap-3"
+              data-ocid="home.role_pills.section"
+            >
+              {ROLE_PILLS.map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  data-ocid={`home.role_pill.${pill.id}.button`}
+                  onClick={() => handleRolePillClick(pill)}
+                  style={{
+                    background: pill.gradient,
+                    border: `1px solid ${pill.border}`,
+                    borderRadius: 9999,
+                    color: pill.textColor,
+                    padding: "10px 24px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    letterSpacing: "0.03em",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    transition: "box-shadow 0.2s, transform 0.2s",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                      pill.glow;
+                    (e.currentTarget as HTMLButtonElement).style.transform =
+                      "scale(1.04)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                      "none";
+                    (e.currentTarget as HTMLButtonElement).style.transform =
+                      "scale(1)";
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>{pill.emoji}</span>
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 3 portal access links below role pills */}
+            <div
+              className="flex flex-wrap items-center justify-center gap-6 mt-6"
+              data-ocid="home.portal_links.section"
+            >
+              <button
+                type="button"
+                data-ocid="home.browse_as_buyer.link"
+                onClick={() => {
+                  if (user) {
+                    setUserRole("buyer");
+                    navigate({ to: "/buyer" });
+                  } else openLoginModal("buyer");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#D4AF37",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                  padding: "4px 0",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.7";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                }}
+              >
+                Browse as Buyer →
+              </button>
+              <button
+                type="button"
+                data-ocid="home.list_property.link"
+                onClick={() => {
+                  if (user) {
+                    setUserRole("seller");
+                    navigate({ to: "/seller" });
+                  } else openLoginModal("seller");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#10B981",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                  padding: "4px 0",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.7";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                }}
+              >
+                List Property →
+              </button>
+              <button
+                type="button"
+                data-ocid="home.banker_access.link"
+                onClick={() => {
+                  if (user) {
+                    setUserRole("banker");
+                    navigate({ to: "/bank" });
+                  } else openLoginModal("banker");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#60A5FA",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                  padding: "4px 0",
+                  transition: "opacity 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.7";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                }}
+              >
+                Banker Access →
+              </button>
+            </div>
+          </div>
+        </section>
+
         <PortalEntryCards />
         <StatsCounter />
         <MissionVision />

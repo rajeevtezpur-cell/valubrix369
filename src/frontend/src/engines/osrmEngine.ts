@@ -22,7 +22,14 @@ export type POIType =
   | "college"
   | "mall"
   | "airport"
-  | "highway";
+  | "highway"
+  | "police"
+  | "petrol_pump"
+  | "pharmacy"
+  | "supermarket"
+  | "restaurant"
+  | "bank"
+  | "atm";
 
 export interface OSRMResult {
   name: string;
@@ -202,7 +209,8 @@ function buildHaversineFallback(
 /**
  * Batch-fetch driving distances + durations from one origin to many POIs.
  *
- * Uses OSRM Table API (single HTTP call for all destinations).
+ * Splits destinations into chunks of MAX_BATCH_SIZE (10) and calls OSRM Table API
+ * sequentially with an 80ms gap between batches to avoid rate-limiting.
  * Pre-filters with haversine to reduce payload — haversine is NEVER surfaced in UI.
  * Falls back to road-factor haversine estimate when OSRM is unreachable.
  *
@@ -212,6 +220,8 @@ function buildHaversineFallback(
  * @param maxRadiusKm   Haversine pre-filter radius (default 10 km)
  * @returns             Array of OSRMResult sorted by driving distance asc
  */
+const MAX_BATCH_SIZE = 10;
+
 export async function getOSRMDistances(
   originLat: number,
   originLng: number,
@@ -229,122 +239,43 @@ export async function getOSRMDistances(
     const cacheKey = getCacheKey(originLat, originLng, nearby);
     const cached = getCached(cacheKey);
     if (cached !== null) {
-      // Filter cached results to only those POIs requested
       const nameSet = new Set(nearby.map((p) => p.name));
       return cached.filter((r) => nameSet.has(r.name));
     }
 
-    // 3. Build OSRM Table API URL
-    // Coordinates: lng,lat (OSRM convention — NOT lat,lng)
-    const originCoord = `${originLng},${originLat}`;
-    const destCoords = nearby.map((p) => `${p.lng},${p.lat}`).join(";");
-    const allCoords = `${originCoord};${destCoords}`;
-    const url = `${OSRM_BASE}/table/v1/driving/${allCoords}?sources=0&annotations=distance,duration`;
+    // 3. Batch into groups of MAX_BATCH_SIZE and call OSRM sequentially
+    const allResults: OSRMResult[] = [];
 
-    // [OSRM] Verification logging
-    console.log(`[OSRM] Source: ${originLat}, ${originLng} | URL: ${url}`);
-
-    // 4. Fetch with retry on 429
-    const response = await fetchWithRetry(url, 2);
-    if (!response || !response.ok) {
-      // OSRM unreachable — fall back to haversine estimate so map pins still render
-      console.warn(
-        "[OSRM] API unreachable — using road-factor haversine fallback",
+    for (let i = 0; i < nearby.length; i += MAX_BATCH_SIZE) {
+      const batch = nearby.slice(i, i + MAX_BATCH_SIZE);
+      const batchResults = await _fetchOSRMTableBatch(
+        originLat,
+        originLng,
+        batch,
       );
-      const fallback = buildHaversineFallback(originLat, originLng, nearby);
-      setCache(cacheKey, fallback);
-      return fallback;
-    }
+      allResults.push(...batchResults);
 
-    const json: OSRMTableResponse = await response.json();
-    if (json.code !== "Ok") {
-      console.warn(
-        "[OSRM] Non-OK response code:",
-        json.code,
-        "— using haversine fallback",
-      );
-      const fallback = buildHaversineFallback(originLat, originLng, nearby);
-      setCache(cacheKey, fallback);
-      return fallback;
-    }
-
-    const durationRow = json.durations?.[0];
-    const distanceRow = json.distances?.[0];
-
-    if (!durationRow) {
-      console.warn("[OSRM] Empty duration row — using haversine fallback");
-      const fallback = buildHaversineFallback(originLat, originLng, nearby);
-      setCache(cacheKey, fallback);
-      return fallback;
-    }
-
-    // [OSRM] Log first result as verification sample
-    if (durationRow.length > 0 && distanceRow && distanceRow.length > 0) {
-      const sampleDistM = distanceRow[0];
-      const sampleDurS = durationRow[0];
-      const sampleKm = Math.round((sampleDistM / 1000) * 10) / 10;
-      const sampleMins = Math.round(sampleDurS / 60);
-      console.log(
-        `[OSRM] Response sample: distance=${Math.round(sampleDistM)}m, duration=${Math.round(sampleDurS)}s, calculated=${sampleKm}km ${sampleMins}mins`,
-      );
-    }
-
-    // 5. Parse results
-    // Index 0 in the response is the source (origin) itself — destinations start at index 1
-    // BUT: when sources=0 is specified, the table returns:
-    //   durations[0][0] = origin→destination[0]
-    //   durations[0][1] = origin→destination[1]
-    // So destination index i → durationRow[i], distanceRow[i]
-    const results: OSRMResult[] = [];
-
-    for (let i = 0; i < nearby.length; i++) {
-      const poi = nearby[i];
-      const durationSec = durationRow[i];
-      let distanceM = distanceRow?.[i] ?? null;
-
-      // Fallback: if distances not returned, estimate from duration at avg 30 km/h
-      // This fallback is ONLY used when the table API distances array is entirely absent
-      if (distanceM === null || distanceM === undefined || distanceM < 0) {
-        if (durationSec == null || durationSec < 0) continue;
-        distanceM = (durationSec / 3600) * 30 * 1000; // 30 km/h average
+      // 80ms courtesy gap between batches to avoid rate-limiting
+      if (i + MAX_BATCH_SIZE < nearby.length) {
+        await new Promise((r) => setTimeout(r, 80));
       }
-
-      if (durationSec == null || durationSec < 0) continue;
-
-      const osrmKm = Math.round((distanceM / 1000) * 10) / 10;
-      const osrmDurationMins = Math.round(durationSec / 60);
-
-      results.push({
-        name: poi.name,
-        lat: poi.lat,
-        lng: poi.lng,
-        osrmKm,
-        osrmDurationMins,
-        type: poi.type,
-        ...(poi.impactTag ? { impactTag: poi.impactTag } : {}),
-        ...(poi.impactDescription
-          ? { impactDescription: poi.impactDescription }
-          : {}),
-        ...(poi.line ? { line: poi.line } : {}),
-        ...(poi.area ? { area: poi.area } : {}),
-      });
     }
 
-    // 6. Sort by driving distance ascending
-    results.sort((a, b) => a.osrmKm - b.osrmKm);
+    // 4. Sort by driving distance ascending
+    allResults.sort((a, b) => a.osrmKm - b.osrmKm);
 
-    // 7. Cache all results for this origin
-    setCache(cacheKey, results);
+    // 5. Cache all results for this origin
+    setCache(cacheKey, allResults);
 
-    return results;
+    return allResults;
   } catch {
-    // Any network error, parse error, abort — try haversine fallback
+    // Any outer error — try haversine fallback
     try {
       const nearby = pois.filter(
         (p) => haversineKm(originLat, originLng, p.lat, p.lng) <= maxRadiusKm,
       );
       if (nearby.length > 0) {
-        console.warn("[OSRM] Exception in fetch — using haversine fallback");
+        console.warn("[OSRM] Exception in batch — using haversine fallback");
         return buildHaversineFallback(originLat, originLng, nearby);
       }
     } catch {
@@ -352,6 +283,103 @@ export async function getOSRMDistances(
     }
     return [];
   }
+}
+
+/**
+ * Internal: call OSRM Table API for a single batch (max 10 destinations).
+ */
+async function _fetchOSRMTableBatch(
+  originLat: number,
+  originLng: number,
+  batch: POIInput[],
+): Promise<OSRMResult[]> {
+  // Build OSRM Table API URL
+  // Coordinates: lng,lat (OSRM convention — NOT lat,lng)
+  const originCoord = `${originLng},${originLat}`;
+  const destCoords = batch.map((p) => `${p.lng},${p.lat}`).join(";");
+  const allCoords = `${originCoord};${destCoords}`;
+  const url = `${OSRM_BASE}/table/v1/driving/${allCoords}?sources=0&annotations=distance,duration`;
+
+  console.log(
+    `[OSRM] Batch(${batch.length}): ${originLat}, ${originLng} → ${batch.map((p) => p.name.slice(0, 8)).join(",")}`,
+  );
+
+  // Fetch with retry on 429
+  const response = await fetchWithRetry(url, 2);
+  // Rate-limit courtesy delay
+  await new Promise((r) => setTimeout(r, 80));
+
+  if (!response || !response.ok) {
+    console.warn(
+      "[OSRM] Batch unreachable — using road-factor haversine fallback",
+    );
+    return buildHaversineFallback(originLat, originLng, batch);
+  }
+
+  const json: OSRMTableResponse = await response.json();
+  if (json.code !== "Ok") {
+    console.warn(
+      "[OSRM] Batch non-OK response:",
+      json.code,
+      "— haversine fallback",
+    );
+    return buildHaversineFallback(originLat, originLng, batch);
+  }
+
+  const durationRow = json.durations?.[0];
+  const distanceRow = json.distances?.[0];
+
+  if (!durationRow) {
+    console.warn("[OSRM] Batch empty duration row — haversine fallback");
+    return buildHaversineFallback(originLat, originLng, batch);
+  }
+
+  const results: OSRMResult[] = [];
+
+  for (let i = 0; i < batch.length; i++) {
+    const poi = batch[i];
+    const durationSec = durationRow[i];
+    let distanceM = distanceRow?.[i] ?? null;
+
+    if (distanceM === null || distanceM === undefined || distanceM < 0) {
+      if (durationSec == null || durationSec < 0) continue;
+      distanceM = (durationSec / 3600) * 30 * 1000; // 30 km/h average
+    }
+
+    if (durationSec == null || durationSec < 0) continue;
+
+    const osrmKm = Math.round((distanceM / 1000) * 10) / 10;
+    const osrmDurationMins = Math.round(durationSec / 60);
+
+    // Guard: if OSRM returns 0km + 0mins but haversine shows >0.1km apart,
+    // skip — coordinates snapped to same road node
+    if (osrmKm === 0 && osrmDurationMins === 0) {
+      const aerialKm = haversineKm(originLat, originLng, poi.lat, poi.lng);
+      if (aerialKm > 0.1) {
+        console.warn(
+          `[OSRM] Zero distance guard: skipping ${poi.name} (haversine=${aerialKm.toFixed(2)}km)`,
+        );
+        continue;
+      }
+    }
+
+    results.push({
+      name: poi.name,
+      lat: poi.lat,
+      lng: poi.lng,
+      osrmKm,
+      osrmDurationMins,
+      type: poi.type,
+      ...(poi.impactTag ? { impactTag: poi.impactTag } : {}),
+      ...(poi.impactDescription
+        ? { impactDescription: poi.impactDescription }
+        : {}),
+      ...(poi.line ? { line: poi.line } : {}),
+      ...(poi.area ? { area: poi.area } : {}),
+    });
+  }
+
+  return results;
 }
 
 // ─── OSRM Route API ───────────────────────────────────────────────────────────

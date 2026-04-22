@@ -6,19 +6,21 @@
 export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
   {
     // ─── North Bangalore ──────────────────────────────────────────────────────
-    jalahalli: { lat: 13.0516, lng: 77.5348 },
+    jalahalli: { lat: 13.0442, lng: 77.5598 },
     "jalahalli east": { lat: 13.05, lng: 77.55 },
     "jalahalli west": { lat: 13.0516, lng: 77.52 },
+    "jalahalli cross": { lat: 13.0442, lng: 77.5598 },
     peenya: { lat: 13.0281, lng: 77.5242 },
     "peenya industrial area": { lat: 13.028, lng: 77.515 },
     "peenya 2nd stage": { lat: 13.03, lng: 77.52 },
-    // Yeshwanthpur: Green Line metro station area near Yeshwanthpur Junction
-    // Verified: 13.024, 77.555 (BMRCL + Google Maps cross-check April 2026)
+    // Yeshwanthpur: Green Line metro station + railway junction area
+    // Verified: 13.0249, 77.5546 — Yeshwanthpur Railway Junction (Indian Railways April 2026)
     // NOTE: was incorrectly 12.9787 (near Rajajinagar) — now corrected
-    yeshwanthpur: { lat: 13.024, lng: 77.555 },
+    yeshwanthpur: { lat: 13.0249, lng: 77.5546 },
+    "yeshwanthpur junction": { lat: 13.0249, lng: 77.5546 },
     rajajinagar: { lat: 12.991, lng: 77.555 },
     "rt nagar": { lat: 13.022, lng: 77.594 },
-    hebbal: { lat: 13.035, lng: 77.597 },
+    hebbal: { lat: 13.035, lng: 77.596 },
     nagawara: { lat: 13.0486, lng: 77.62 },
     nagavara: { lat: 13.048, lng: 77.62 },
     "nagawara junction": { lat: 13.048, lng: 77.62 },
@@ -107,13 +109,13 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
     "kiadb extension": { lat: 13.15, lng: 77.655 },
     // ─── East Bangalore ───────────────────────────────────────────────────────
     whitefield: { lat: 12.9698, lng: 77.7499 },
-    "sarjapur road": { lat: 12.91, lng: 77.687 },
+    "sarjapur road": { lat: 12.9076, lng: 77.6742 },
     sarjapur: { lat: 12.91, lng: 77.687 },
-    marathahalli: { lat: 12.9547, lng: 77.7019 },
+    marathahalli: { lat: 12.9591, lng: 77.7001 },
     bellandur: { lat: 12.9352, lng: 77.6958 },
     kadubeesanahalli: { lat: 12.935, lng: 77.697 },
     "kr puram": { lat: 13.0077, lng: 77.695 },
-    indiranagar: { lat: 12.9784, lng: 77.6408 },
+    indiranagar: { lat: 12.9716, lng: 77.6412 },
     domlur: { lat: 12.96, lng: 77.639 },
     hoodi: { lat: 12.992, lng: 77.716 },
     kundalahalli: { lat: 12.967, lng: 77.715 },
@@ -141,7 +143,7 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
     budigere: { lat: 13.03, lng: 77.73 },
     "budigere cross": { lat: 13.03, lng: 77.73 },
     // ─── South Bangalore ──────────────────────────────────────────────────────
-    "electronic city": { lat: 12.8399, lng: 77.677 },
+    "electronic city": { lat: 12.84, lng: 77.677 },
     "electronic city phase 1": { lat: 12.8399, lng: 77.677 },
     "electronic city phase 2": { lat: 12.83, lng: 77.68 },
     "bannerghatta road": { lat: 12.9, lng: 77.6 },
@@ -182,7 +184,7 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
     nagarbhavi: { lat: 12.95, lng: 77.51 },
     "magadi road": { lat: 12.98, lng: 77.525 },
     "tumkur road": { lat: 13.05, lng: 77.5 },
-    nagasandra: { lat: 13.0484, lng: 77.5057 },
+    nagasandra: { lat: 13.0594, lng: 77.5229 },
     devinagar: { lat: 13.04, lng: 77.544 },
     chikkabidarakallu: { lat: 13.043, lng: 77.503 },
     lottegollahalli: { lat: 13.0531, lng: 77.5272 },
@@ -299,7 +301,7 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
     "ubs city": { lat: 12.9716, lng: 77.5946 },
     "ub city": { lat: 12.9754, lng: 77.607 },
     "mg road ub city": { lat: 12.9756, lng: 77.6066 },
-    "prestige tech park": { lat: 12.9172, lng: 77.6793 },
+    "prestige tech park": { lat: 12.9178, lng: 77.6462 },
     "prestige shantiniketan": { lat: 12.9787, lng: 77.7285 },
     "global tech park": { lat: 12.9843, lng: 77.7263 },
     "cessna business park": { lat: 12.9399, lng: 77.697 },
@@ -366,8 +368,9 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
 
     // ── New locations: North Bangalore ────────────────────────────────────────
     // BEL Circle = Bharat Electronics Limited junction area near Jalahalli Cross
-    // Verified: 13.042, 77.567 (Google Maps cross-check April 2026)
+    // Verified: 13.042, 77.567 — BEL main gate / Jalahalli Cross area (April 2026)
     "bel circle": { lat: 13.042, lng: 77.567 },
+    "bel campus": { lat: 13.042, lng: 77.567 },
     chikkabanavara: { lat: 13.062, lng: 77.498 },
     "hesaraghatta road": { lat: 13.095, lng: 77.487 },
     "tata nagar": { lat: 13.04, lng: 77.557 },
@@ -407,8 +410,8 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
 
     // ── Metro station coordinates (Namma Metro — verified BMRCL, April 2026) ──
     // These are distinct from locality names above — they pinpoint the station itself.
-    "yeshwanthpur metro": { lat: 13.0209, lng: 77.5498 },
-    "nagasandra metro": { lat: 13.0484, lng: 77.5057 },
+    "yeshwanthpur metro": { lat: 13.0284, lng: 77.5554 },
+    "nagasandra metro": { lat: 13.0541, lng: 77.5564 },
     "sandal soap factory metro": { lat: 13.0327, lng: 77.5333 },
     "mahalakshmi metro": { lat: 13.0155, lng: 77.5432 },
     "rajajinagar metro": { lat: 12.9951, lng: 77.5519 },
@@ -580,7 +583,15 @@ export const ALL_LOCALITY_COORDS: Record<string, { lat: number; lng: number }> =
     "patel nagar": { lat: 13.0034, lng: 77.5668 },
     sriramnagar: { lat: 12.9658, lng: 77.5349 },
     laggere: { lat: 13.0168, lng: 77.5202 },
-    "manayata tech park": { lat: 13.0457, lng: 77.6231 },
+    "manayata tech park": { lat: 13.0468, lng: 77.6228 },
+
+    // ── Airport entries ───────────────────────────────────────────────────────
+    "kia bangalore": { lat: 13.1986, lng: 77.7066 },
+    "kempegowda international airport": { lat: 13.1986, lng: 77.7066 },
+    "bangalore airport": { lat: 13.1986, lng: 77.7066 },
+
+    // ── Key landmarks ─────────────────────────────────────────────────────────
+    "kirloskar business park": { lat: 13.03, lng: 77.5567 },
   };
 
 /**

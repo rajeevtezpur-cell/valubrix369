@@ -16,6 +16,9 @@ import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
 import AILearnLib "lib/ai-learning";
 import MixinAILearning "mixins/ai-learning-api";
+import BankerLib "lib/banker";
+import MixinBanker "mixins/banker-api";
+import ValTypes "types/valuation";
 import Stripe "mo:caffeineai-stripe/stripe";
 import OutCall "mo:caffeineai-http-outcalls/outcall";
 
@@ -108,6 +111,14 @@ actor {
     public var aiLearningIdCounter   : Nat = 0;
   };
   include MixinAILearning(aiLearningState);
+
+  // BANKER APPROVAL STATE
+  // -------------------------------------------------
+  let bankerAppsState = object {
+    public var bankerApps       : Map.Map<Nat, BankerLib.BankerApplication> = Map.empty<Nat, BankerLib.BankerApplication>();
+    public var bankerAppCounter : Nat = 0;
+  };
+  include MixinBanker(bankerAppsState, accessControlState);
 
   // USERS
   // -------------------------------------------------
@@ -2134,8 +2145,210 @@ actor {
   };
 
   // ================================================================
-  // MANUAL PROJECT ENTRIES
+  // EXTENDED VALUATION — with ApartmentSubType + Builder Multiplier
   // ================================================================
+
+  // Builder premium table (× 1000 fixed-point, so 1000 = 1.0×)
+  // Derived from dataset analysis — premium builders command higher PSF.
+  // Clamp: 900 (0.90×) to 1400 (1.40×).
+  func getBuilderMultiplier1000(builderName : ?Text) : (Nat, Text) {
+    let raw = switch (builderName) {
+      case (null) { (1000, "default") };
+      case (?b) {
+        let bl = b.toLower();
+        if (bl.contains(#text "prestige")) {
+          (1180, b)
+        } else if (bl.contains(#text "sobha")) {
+          (1200, b)
+        } else if (bl.contains(#text "brigade")) {
+          (1120, b)
+        } else if (bl.contains(#text "godrej")) {
+          (1150, b)
+        } else if (bl.contains(#text "puravankara") or bl.contains(#text "purva")) {
+          (1080, b)
+        } else if (bl.contains(#text "concorde")) {
+          (1050, b)
+        } else if (bl.contains(#text "salarpuria")) {
+          (1100, b)
+        } else if (bl.contains(#text "manyata") or bl.contains(#text "nitesh")) {
+          (1090, b)
+        } else if (bl.contains(#text "arvind") or bl.contains(#text "arv")) {
+          (1060, b)
+        } else if (bl.contains(#text "mahindra")) {
+          (1130, b)
+        } else if (bl.contains(#text "tata")) {
+          (1140, b)
+        } else if (bl.contains(#text "dlf")) {
+          (1170, b)
+        } else if (bl.contains(#text "lodha")) {
+          (1160, b)
+        } else if (bl.contains(#text "embassy")) {
+          (1100, b)
+        } else {
+          // Unknown builder: use locality-median (no bump)
+          (1000, b)
+        }
+      };
+    };
+    // Clamp 900–1400
+    let clamped = if (raw.0 < 900) 900 else if (raw.0 > 1400) 1400 else raw.0;
+    (clamped, raw.1)
+  };
+
+  // Apartment sub-type multiplier table (× 1000 fixed-point).
+  // Standalone < Gated < Township (premium amenities + brand trust).
+  func getSubTypeMultiplier1000(subType : ?ValTypes.ApartmentSubType, propertyType : Text) : (Nat, Text) {
+    if (propertyType != "apartment") {
+      return (1000, "none");  // sub-type only applies to apartments
+    };
+    switch (subType) {
+      case (null) { (1000, "unknown") };
+      case (?st) {
+        switch (st) {
+          case (#standalone) { (950,  "standalone") };  // slight discount vs gated
+          case (#gated)      { (1000, "gated")      };  // baseline
+          case (#township)   { (1080, "township")   };  // township premium
+          case (#unknown)    { (1000, "unknown")    };  // treat as gated baseline
+        };
+      };
+    };
+  };
+
+  /// Extended valuation endpoint — accepts ValuationRequest, returns ValuationResult.
+  /// Uses the same core engine as computeValuation but layers in:
+  ///   1. Builder premium multiplier (clamped 0.90–1.40)
+  ///   2. Apartment sub-type multiplier (standalone < gated < township)
+  public query func submitValuation(req : ValTypes.ValuationRequest) : async ValTypes.ValuationResult {
+    let locality     = req.locality;
+    let propertyType = req.propertyType;
+    let sqft         = req.sqft;
+    let age          = req.age;
+    let amenitiesCount = req.amenitiesCount;
+
+    let (builderMult1000, builderApplied) = getBuilderMultiplier1000(req.builderName);
+    let (subTypeMult1000, subTypeApplied) = getSubTypeMultiplier1000(req.apartmentSubType, propertyType);
+
+    switch (findLocality(locality)) {
+      case (null) {
+        let defaultPPS : Nat = 7000;
+        let base = defaultPPS * sqft;
+        let adjusted = base * builderMult1000 / 1000 * subTypeMult1000 / 1000;
+        {
+          priceMin         = adjusted * 88 / 100;
+          priceMax         = adjusted * 112 / 100;
+          bestPrice        = adjusted;
+          confidence       = 20;
+          confidenceReason = "Locality not in dataset. Using city-tier average.";
+          localityFound    = false;
+          comparablesContribution = 0;
+          locationContribution    = 0;
+          demandContribution      = 0;
+          infraContribution       = 0;
+          metroContribution       = 0;
+          comparablesUsed         = 0;
+          pricePerSqft            = defaultPPS;
+          builderMultiplier       = builderMult1000;
+          subTypeMultiplier       = subTypeMult1000;
+          subTypeApplied;
+          builderApplied;
+        };
+      };
+      case (?d) {
+        let basePPS : Nat = switch (computeMovingAverage(locality, 5)) {
+          case (?avg) { avg };
+          case (null) { d.avgPricePerSqft };
+        };
+        let basePrice = basePPS * sqft;
+
+        let typeMultiplier : Nat = if (propertyType == "villa") 125
+          else if (propertyType == "plot") 75
+          else 100;
+
+        let agePenalty : Nat = if (age * 50 / 100 > 15) 15 else age * 50 / 100;
+        let ageFactor  : Nat = 100 - agePenalty;
+        let amenBonus  : Nat = if (amenitiesCount * 50 / 100 > 8) 8 else amenitiesCount * 50 / 100;
+
+        let comparablesBase = basePrice;
+        let locationAdj = basePrice * d.locationScore / 100;
+        let infraAdj    = basePrice * d.infraScore   / 100;
+
+        let activeDemandScore : Nat = switch (getLatestDemandScore(locality)) {
+          case (?ds) { ds };
+          case (null) { d.demandScore };
+        };
+        let demandAdj  = basePrice * activeDemandScore / 100;
+        let metroScore = getMetroProximityScore(locality);
+        let metroAdj   = if (metroScore > 0) { basePrice * metroScore / 100 } else { 0 };
+
+        let weightedRaw : Nat =
+          comparablesBase * 50 / 100 +
+          locationAdj     * 20 / 100 +
+          demandAdj       * 15 / 100 +
+          infraAdj        * 10 / 100 +
+          metroAdj        *  5 / 100;
+
+        let adjusted = weightedRaw
+          * typeMultiplier   / 100
+          * ageFactor        / 100
+          * (100 + amenBonus) / 100;
+
+        let demandBoost   : Nat = activeDemandScore * 10 / 100;
+        let demandAdjusted : Nat = adjusted + adjusted * demandBoost / 100;
+
+        let blended : Nat = switch (localityPriceHistory.get(locality)) {
+          case (null) { demandAdjusted };
+          case (?history) {
+            if (history.size() == 0) { demandAdjusted }
+            else {
+              var sumWeighted : Nat = 0;
+              var sumWeights  : Nat = 0;
+              for (snap in history.vals()) {
+                sumWeighted += snap.pricePerSqft * snap.confidenceWeight;
+                sumWeights  += snap.confidenceWeight;
+              };
+              if (sumWeights == 0) { demandAdjusted }
+              else {
+                let histAvgPPS = sumWeighted / sumWeights;
+                demandAdjusted * 70 / 100 + (histAvgPPS * sqft) * 30 / 100
+              }
+            }
+          };
+        };
+
+        // Apply builder + sub-type multipliers on top of blended price
+        let finalPrice : Nat = blended * builderMult1000 / 1000 * subTypeMult1000 / 1000;
+
+        let historySize   = getPriceHistorySize(locality);
+        let snapshotAge   = getDaysSinceLatestSnapshot(locality);
+        let estVariance   : Nat = if (d.supplyDensity > 70) 25
+          else if (d.supplyDensity > 50) 15
+          else 8;
+        let (confidence, confidenceReason) = computeConfidence(5, estVariance, historySize, snapshotAge);
+
+        {
+          priceMin         = finalPrice * 92 / 100;
+          priceMax         = finalPrice * 108 / 100;
+          bestPrice        = finalPrice;
+          confidence;
+          confidenceReason;
+          localityFound    = true;
+          comparablesContribution = 50;
+          locationContribution    = 20;
+          demandContribution      = 15;
+          infraContribution       = 10;
+          metroContribution       = if (metroScore > 0) 5 else 0;
+          comparablesUsed         = if (historySize > 0) historySize else 5;
+          pricePerSqft            = if (sqft > 0) finalPrice / sqft else basePPS;
+          builderMultiplier       = builderMult1000;
+          subTypeMultiplier       = subTypeMult1000;
+          subTypeApplied;
+          builderApplied;
+        };
+      };
+    };
+  };
+
+
 
   public type ManualProjectEntry = {
     name : Text;

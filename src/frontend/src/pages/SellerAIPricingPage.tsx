@@ -9,6 +9,14 @@ const BASE_RATE: Record<string, number> = {
   Plot: 4500,
   Commercial: 8500,
 };
+
+/** Sub-type multipliers applied to Apartment PSF — consistent with AI Valuation */
+const APARTMENT_SUBTYPE_MULT: Record<string, number> = {
+  standalone: 0.9,
+  gated: 1.0,
+  township: 1.15,
+};
+
 const BHK_MULT: Record<string, number> = {
   "1": 0.85,
   "2": 1.0,
@@ -20,20 +28,28 @@ const MONTHS = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
 
 export default function SellerAIPricingPage() {
   const [propertyType, setPropertyType] = useState("Apartment");
+  const [apartmentSubType, setApartmentSubType] = useState<
+    "standalone" | "gated" | "township"
+  >("gated");
   const [bhk, setBhk] = useState("3");
   const [area, setArea] = useState(1450);
+
+  const subTypeMult =
+    propertyType === "Apartment"
+      ? (APARTMENT_SUBTYPE_MULT[apartmentSubType] ?? 1.0)
+      : 1.0;
 
   const estimatedCr = useMemo(() => {
     const rate = BASE_RATE[propertyType] ?? 9200;
     const mult = BHK_MULT[bhk] ?? 1.0;
-    return ((area * rate * mult) / 10000000).toFixed(2);
-  }, [propertyType, bhk, area]);
+    return ((area * rate * mult * subTypeMult) / 10000000).toFixed(2);
+  }, [propertyType, bhk, area, subTypeMult]);
 
   const marketAvg = useMemo(() => {
     const rate = (BASE_RATE[propertyType] ?? 9200) * 0.95;
     const mult = BHK_MULT[bhk] ?? 1.0;
-    return ((area * rate * mult) / 10000000).toFixed(2);
-  }, [propertyType, bhk, area]);
+    return ((area * rate * mult * subTypeMult) / 10000000).toFixed(2);
+  }, [propertyType, bhk, area, subTypeMult]);
 
   const trendBase = [118, 121, 124, 127, 129, 132];
   const trendMult = (BASE_RATE[propertyType] ?? 9200) / 9200;
@@ -108,6 +124,33 @@ export default function SellerAIPricingPage() {
                 ))}
               </select>
             </div>
+
+            {/* Apartment Sub-Type — shown only when Apartment is selected */}
+            {propertyType === "Apartment" && (
+              <div>
+                <label
+                  htmlFor="apt-subtype"
+                  className="text-white/50 text-xs mb-1.5 block"
+                >
+                  Apartment Type <span className="text-red-400">*</span>
+                </label>
+                <select
+                  id="apt-subtype"
+                  value={apartmentSubType}
+                  onChange={(e) =>
+                    setApartmentSubType(
+                      e.target.value as "standalone" | "gated" | "township",
+                    )
+                  }
+                  data-ocid="seller_pricing.apartment_subtype.select"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-[#D4AF37]/40"
+                >
+                  <option value="standalone">Standalone (×0.90)</option>
+                  <option value="gated">Gated Community (×1.00)</option>
+                  <option value="township">Township (×1.15)</option>
+                </select>
+              </div>
+            )}
             <div>
               <label
                 htmlFor="pricing-bhk"

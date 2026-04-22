@@ -22,6 +22,28 @@
  * West localities use existing hardcoded estimates or null if absent.
  */
 
+// ─── Lazy import for learned PSF (avoids circular dependency) ─────────────────
+// Dynamically resolved at call time so linearRegressionEngine can import from
+// localityEngine without a circular dependency at module parse time.
+function _tryGetCachedLocalityPSF(
+  propertyType: "apartment" | "villa" | "plot" | "commercial",
+): Record<string, number> | null {
+  try {
+    // Lazy dynamic require to avoid circular imports at parse time
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const lrModule = require("../engines/linearRegressionEngine") as {
+      getCachedLocalityPSF?: (
+        t: string,
+        r: string,
+      ) => Record<string, number> | null;
+    };
+    if (typeof lrModule.getCachedLocalityPSF !== "function") return null;
+    return lrModule.getCachedLocalityPSF(propertyType, "global");
+  } catch {
+    return null;
+  }
+}
+
 // ─── Per-Type PSF Interface ───────────────────────────────────────────────────
 /**
  * LocalityPSF — per-property-type PSF values for a locality.
@@ -165,19 +187,20 @@ const LOCALITY_BASE_PSF_TYPED: Record<string, LocalityPSF> = {
     commercial: 20000,
     baseMedian: 12000,
   },
+  // Rajakunte: north outer-periphery ~18km from Hebbal — correct PSF ₹4,800 (not 11,500)
   rajankunte: {
-    apartment: 11500,
-    villa: 11000,
-    plot: 8000,
-    commercial: 10000,
-    baseMedian: 11500,
+    apartment: 4800,
+    villa: 6000,
+    plot: 3500,
+    commercial: 5200,
+    baseMedian: 4800,
   },
   rajanakunte: {
-    apartment: 11500,
-    villa: 11000,
-    plot: 8000,
-    commercial: 10000,
-    baseMedian: 11500,
+    apartment: 4800,
+    villa: 6000,
+    plot: 3500,
+    commercial: 5200,
+    baseMedian: 4800,
   },
   kothanur: {
     apartment: 8000,
@@ -564,13 +587,21 @@ const LOCALITY_BASE_PSF_TYPED: Record<string, LocalityPSF> = {
     commercial: 5000,
     baseMedian: 15000,
   },
-  // Rajanukunte: updated April 2026 — apartment ₹11,500, plot ₹8,000
+  // rajakunte alias — maps to same record as rajankunte (common search spelling)
+  rajakunte: {
+    apartment: 4800,
+    villa: 6000,
+    plot: 3500,
+    commercial: 5200,
+    baseMedian: 4800,
+  },
+  // Rajanukunte: north outer-periphery — correct PSF ₹4,800 (was wrongly set to 11,500)
   rajanukunte: {
-    apartment: 11500,
-    villa: 11000,
-    plot: 8000,
-    commercial: 10000,
-    baseMedian: 11500,
+    apartment: 4800,
+    villa: 6000,
+    plot: 3500,
+    commercial: 5200,
+    baseMedian: 4800,
   },
   // Sahakarnagar: updated April 2026 — apartment ₹14,500, plot ₹20,000
   sahakarnagar: {
@@ -1301,7 +1332,11 @@ const LOCALITY_BASE_PSF: Record<string, number> = Object.fromEntries(
 
 // Merge: LOCALITY_BASE_PSF already built from LOCALITY_BASE_PSF_TYPED above.
 
-/** Returns base sale PSF for a locality (INR per sq ft). */
+/**
+ * getBaseMicroLocationPSF — returns base sale PSF for a locality (INR per sq ft).
+ * Falls back to outer-periphery default (4,500) for unknown localities.
+ * NEVER falls back to a high-value zone.
+ */
 export function getBaseMicroLocationPSF(locality: string): number {
   const key = locality.trim().toLowerCase();
   // Exact match first
@@ -1310,7 +1345,7 @@ export function getBaseMicroLocationPSF(locality: string): number {
   for (const [k, v] of Object.entries(LOCALITY_BASE_PSF)) {
     if (key.includes(k) || k.includes(key)) return v;
   }
-  return 7000; // city-level fallback for Bangalore
+  return 4500; // outer-periphery default for unknown Bangalore localities (was 7000 — too high)
 }
 
 /**
@@ -1359,12 +1394,13 @@ function findTypedEntry(locality: string): LocalityPSF | null {
 /**
  * Zone-level fallback PSF by property type.
  * Used when a locality has no entry in LOCALITY_BASE_PSF_TYPED.
+ * Falls back to outer-periphery default (4,500 apartment) — never a high-value zone.
  */
 function getZoneFallbackPSFByType(
   locality: string,
   propertyType: "apartment" | "villa" | "plot" | "commercial",
 ): number {
-  const basePSF = getBaseMicroLocationPSF(locality); // falls back to 7000
+  const basePSF = getBaseMicroLocationPSF(locality); // falls back to 4500 for unknown
   const ZONE_FALLBACK_RATIOS: Record<typeof propertyType, number> = {
     apartment: 1.0,
     villa: 1.28,
@@ -1372,6 +1408,46 @@ function getZoneFallbackPSFByType(
     commercial: 1.09,
   };
   return Math.round(basePSF * ZONE_FALLBACK_RATIOS[propertyType]);
+}
+
+/**
+ * getLearnedPSF — looks up the trained model's locality PSF cache to get a
+ * data-driven PSF value for any locality that has training data.
+ *
+ * Returns null when:
+ *   - Model weights not yet available (still training at startup)
+ *   - Locality not present in the training corpus
+ *   - Cache lookup fails for any reason
+ *
+ * When it returns a value, getBasePSF() uses it in preference to the hardcoded
+ * table — so accuracy improves automatically as more data is added without
+ * requiring manual table updates.
+ *
+ * @internal Used only by getBasePSF — do not call directly.
+ */
+function getLearnedPSF(
+  locality: string,
+  propertyType: "apartment" | "villa" | "plot" | "commercial",
+): number | null {
+  try {
+    const cache = _tryGetCachedLocalityPSF(propertyType);
+    if (!cache) return null;
+
+    const key = locality.trim().toLowerCase();
+
+    // Exact match on locality name key
+    if (cache[key] !== undefined && cache[key] > 0) return cache[key];
+
+    // Partial match
+    for (const [k, v] of Object.entries(cache)) {
+      if (typeof v === "number" && v > 0) {
+        if (key.includes(k) || k.includes(key)) return v;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1383,6 +1459,15 @@ function getZoneFallbackPSFByType(
  *       ├── AI Valuation (starting base before adjustments)
  *       └── Comparison module (consistent baseline)
  *
+ * Resolution order:
+ *   1. psfLearningEngine (data-driven, dataset-trained — highest accuracy)
+ *   2. Learned PSF from linearRegressionEngine weights (legacy path)
+ *   3. LOCALITY_BASE_PSF_TYPED table (corrected values, safety fallback)
+ *   4. Zone-level derivation (last resort — outer-periphery default 4,500)
+ *
+ * IMPORTANT: The fallback chain NEVER returns a high-value zone PSF for outer
+ * localities like Rajakunte. The outer-periphery default is ₹4,500.
+ *
  * @param locality      Locality name (case-insensitive, fuzzy matched)
  * @param propertyType  Property type — determines which PSF column to use
  * @returns             PSF in INR/sqft. Never returns 0.
@@ -1391,9 +1476,30 @@ export function getBasePSF(
   locality: string,
   propertyType: "apartment" | "villa" | "plot" | "commercial",
 ): number {
+  // ── Layer 0: psfLearningEngine (data-driven, highest priority) ──────────────
+  try {
+    // Lazy import to avoid circular dependency at parse time
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const psfModule = require("../engines/psfLearningEngine") as {
+      getLearnedPSF?: (locality: string, type: string) => number;
+    };
+    if (typeof psfModule.getLearnedPSF === "function") {
+      const psfValue = psfModule.getLearnedPSF(locality, propertyType);
+      if (psfValue && psfValue > 0) return psfValue;
+    }
+  } catch {
+    // ignore — fall through to next layer
+  }
+
+  // ── Layer 1: linearRegressionEngine learned PSF weights ──────────────────────
+  const learnedPSF = getLearnedPSF(locality, propertyType);
+  if (learnedPSF !== null && learnedPSF > 0) return learnedPSF;
+
+  // ── Layer 2: Typed table (safety fallback) ───────────────────────────────────
   const entry = findTypedEntry(locality);
   if (entry) return entry[propertyType];
-  // Fallback: zone-level derivation from baseMedian
+
+  // ── Layer 3: Zone-level derivation (outer-periphery default) ────────────────
   return getZoneFallbackPSFByType(locality, propertyType);
 }
 
@@ -1429,6 +1535,25 @@ export type LocalityZone =
   | "south"
   | "central"
   | "unknown";
+
+/**
+ * Human-readable zone display labels.
+ * Used by UI components — never show "unknown" to the user.
+ */
+export const LOCALITY_ZONE_LABELS: Record<LocalityZone, string> = {
+  "north-inner": "North Bangalore",
+  "north-mid": "North Bangalore",
+  "north-outer": "North Bangalore",
+  "airport-corridor": "Airport Corridor",
+  northwest: "North-West Bangalore",
+  "east-core": "East Bangalore",
+  "east-mid": "East Bangalore",
+  "east-outer": "East Bangalore",
+  "east-peripheral": "East Bangalore",
+  south: "South Bangalore",
+  central: "Central Bangalore",
+  unknown: "Bangalore",
+};
 
 const LOCALITY_ZONE_MAP: Record<string, LocalityZone> = {
   hebbal: "north-inner",
@@ -1483,8 +1608,9 @@ const LOCALITY_ZONE_MAP: Record<string, LocalityZone> = {
   chikkabanavara: "northwest",
   kammagondahalli: "northwest",
   addiganahalli: "northwest",
-  rajanakunte: "northwest",
-  rajankunte: "northwest",
+  rajanakunte: "north-outer",
+  rajankunte: "north-outer",
+  rajanukunte: "north-outer",
   rajajinagar: "northwest",
   yeshwanthpur: "northwest",
   whitefield: "east-core",
@@ -1571,10 +1697,372 @@ const LOCALITY_ZONE_MAP: Record<string, LocalityZone> = {
   "bannerghatta main": "south",
 };
 
+// ─── Comprehensive keyword-based zone resolution ──────────────────────────────
+// Used as fallback when locality name is not in LOCALITY_ZONE_MAP.
+// Covers suburb patterns, partial names, and common abbreviations.
+const ZONE_KEYWORD_MAP: Array<{ keywords: string[]; zone: LocalityZone }> = [
+  {
+    keywords: [
+      "rajakunte",
+      "rajanukunte",
+      "rajanakunte",
+      "devanahalli",
+      "devanagundi",
+      "nandi hills",
+      "doddaballapur",
+      "doddaballapura",
+      "bagalur",
+      "sadahalli",
+      "shettigere",
+      "chikkajala",
+      "ivc road",
+      "airport highway",
+      "aerospace park",
+      "kiadb",
+    ],
+    zone: "airport-corridor",
+  },
+  {
+    keywords: [
+      "hebbal",
+      "kempapura",
+      "sahakar nagar",
+      "sahakara nagar",
+      "sahakarnagar",
+      "rt nagar",
+      "ganga nagar",
+      "rmv extension",
+      "rmv ext",
+      "amruthahalli",
+      "amrutahalli",
+      "malleshwaram",
+      "malleswaram",
+    ],
+    zone: "north-inner",
+  },
+  {
+    keywords: [
+      "thanisandra",
+      "nagavara",
+      "nagawara",
+      "hennur",
+      "narayanapura",
+      "manyata",
+      "banjara layout",
+      "vidyaranyapura",
+      "doddabommasandra",
+      "tindlu",
+      "muthyala nagar",
+      "hbr layout",
+      "kogilu",
+      "kothanur",
+      "kannur",
+      "kalkere",
+      "battarahalli",
+      "aerospace",
+      "chikkagubbi",
+    ],
+    zone: "north-mid",
+  },
+  {
+    keywords: [
+      "yelahanka",
+      "jakkur",
+      "kattigenahalli",
+      "nehru nagar",
+      "anantapura",
+      "doddaballapur road",
+      "kogilu",
+    ],
+    zone: "north-outer",
+  },
+  {
+    keywords: [
+      "bel circle",
+      "jalahalli",
+      "peenya",
+      "tumkur road",
+      "nagasandra",
+      "abbigere",
+      "chikkabanavara",
+      "kammagondahalli",
+      "addiganahalli",
+      "rajanukunte",
+      "yeshwanthpur",
+      "rajajinagar",
+      "basaveshwara nagar",
+      "chord road",
+      "vijayanagar",
+      "dasarahalli",
+    ],
+    zone: "northwest",
+  },
+  {
+    keywords: [
+      "whitefield",
+      "kadugodi",
+      "itpl",
+      "mahadevapura",
+      "brookefield",
+      "hoodi",
+      "nallurhalli",
+      "seetharampalya",
+      "pattandur agrahara",
+      "hope farm",
+      "varthur road",
+      "kundalahalli",
+    ],
+    zone: "east-core",
+  },
+  {
+    keywords: [
+      "marathahalli",
+      "aecs layout",
+      "kadubeesanahalli",
+      "sarjapur road",
+      "sarjapur rd",
+      "bellandur",
+      "old airport road",
+      "old madras road",
+      "outer ring road",
+      "orr",
+    ],
+    zone: "east-mid",
+  },
+  {
+    keywords: [
+      "varthur",
+      "gunjur",
+      "panathur",
+      "balagere",
+      "avalahalli",
+      "dommasandra",
+      "dooravani nagar",
+    ],
+    zone: "east-outer",
+  },
+  {
+    keywords: [
+      "kr puram",
+      "horamavu",
+      "kaggadasapura",
+      "budigere",
+      "mandur",
+      "hoskote",
+      "carmelaram",
+      "ramamurthy nagar",
+      "banaswadi",
+      "channasandra",
+      "baiyappanahalli",
+      "tin factory",
+    ],
+    zone: "east-peripheral",
+  },
+  {
+    keywords: [
+      "koramangala",
+      "indiranagar",
+      "mg road",
+      "sadashivanagar",
+      "richmond town",
+      "ulsoor",
+      "frazer town",
+      "cv raman nagar",
+      "vasanth nagar",
+      "shivajinagar",
+      "hal",
+      "kalyan nagar",
+      "kammanahalli",
+      "domlur",
+      "cunningham road",
+    ],
+    zone: "central",
+  },
+  {
+    keywords: [
+      "hsr layout",
+      "hsr",
+      "jayanagar",
+      "bannerghatta",
+      "jp nagar",
+      "btm layout",
+      "electronic city",
+      "bommanahalli",
+      "kanakapura",
+      "banashankari",
+      "nagarbhavi",
+      "chandapura",
+      "attibele",
+      "nelamangala",
+      "jigani",
+      "sarjapur",
+      "bellandur",
+      "begur",
+      "hulimavu",
+      "gottigere",
+      "silk board",
+      "basavanagudi",
+      "subramanyapura",
+      "harohalli",
+      "kengeri",
+    ],
+    zone: "south",
+  },
+];
+
+/**
+ * Derive zone from lat/lng using Bangalore quadrant logic.
+ * Used as a final fallback when name-based lookup fails.
+ * Never returns "unknown".
+ */
+function deriveZoneFromCoords(lat: number, lng: number): LocalityZone {
+  // Bangalore city center approximate: 12.9716, 77.5946
+  if (lat > 13.15) return "airport-corridor";
+  if (lat > 13.07) return "north-outer";
+  if (lat > 13.02 && lng < 77.54) return "northwest";
+  if (lat > 12.99 && lng < 77.6) return "north-inner";
+  if (lat > 12.99) return "north-mid";
+  if (lng > 77.7) return "east-core";
+  if (lng > 77.67) return "east-mid";
+  if (lng > 77.63 && lat < 12.96) return "east-outer";
+  if (lat < 12.87) return "south";
+  if (lat < 12.93 && lng < 77.63) return "south";
+  return "central";
+}
+
 /** Returns the zone a locality belongs to (for cluster fallback logic). */
 export function getLocalityZone(locality: string): LocalityZone {
   const key = locality.trim().toLowerCase();
-  return LOCALITY_ZONE_MAP[key] ?? "unknown";
+
+  // 1. Exact match
+  if (LOCALITY_ZONE_MAP[key] !== undefined) return LOCALITY_ZONE_MAP[key];
+
+  // 2. Partial match in zone map
+  for (const [k, z] of Object.entries(LOCALITY_ZONE_MAP)) {
+    if (key.includes(k) || k.includes(key)) return z;
+  }
+
+  // 3. Keyword-based pattern match (covers suburbs, sub-localities, phases)
+  for (const { keywords, zone } of ZONE_KEYWORD_MAP) {
+    for (const kw of keywords) {
+      if (key.includes(kw) || kw.includes(key)) return zone;
+    }
+  }
+
+  // 4. Coordinate-based fallback via bangaloreMicroLocations
+  try {
+    // Lazy require to avoid circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mlModule = require("../data/bangaloreMicroLocations") as {
+      bangaloreMicroLocations?: Array<{
+        name: string;
+        lat: number;
+        lng: number;
+      }>;
+    };
+    const locs = mlModule.bangaloreMicroLocations ?? [];
+    const match = locs.find(
+      (l) =>
+        l.name.toLowerCase().includes(key) ||
+        key.includes(l.name.toLowerCase()),
+    );
+    if (match) return deriveZoneFromCoords(match.lat, match.lng);
+  } catch {
+    /* silent */
+  }
+
+  // 5. Try coordinate lookup from LOCALITY_COORDS_MAP
+  const coords = getLocalityCoords(locality);
+  if (coords) return deriveZoneFromCoords(coords.lat, coords.lng);
+
+  // 6. Never return "unknown" to UI — use "Bangalore" zone with central PSF
+  return "unknown";
+}
+
+/**
+ * getLocalityZoneLabel — Returns a human-readable zone label for display.
+ * NEVER returns "Unknown" — always returns a meaningful zone string.
+ *
+ * @param locality  Locality name (case-insensitive)
+ * @returns         Human-readable zone label e.g. "North Bangalore"
+ */
+export function getLocalityZoneLabel(locality: string): string {
+  const zone = getLocalityZone(locality);
+  return LOCALITY_ZONE_LABELS[zone] ?? "Bangalore";
+}
+
+/**
+ * getMicroLocationMetadata — Single lookup for zone + coordinates.
+ * All portals should call this when user selects a location,
+ * instead of running reverse geocoding.
+ *
+ * Resolution order:
+ * 1. bangaloreMicroLocations (case-insensitive, exact then partial)
+ * 2. LOCALITY_COORDS_MAP (getLocalityCoords) + getLocalityZoneLabel
+ *
+ * @param locality  Locality name from dropdown selection
+ * @returns         { zone, zoneLabel, lat, lng } or null if completely unknown
+ */
+export function getMicroLocationMetadata(locality: string): {
+  zone: LocalityZone;
+  zoneLabel: string;
+  lat: number;
+  lng: number;
+} | null {
+  const key = locality.trim().toLowerCase();
+
+  // Try bangaloreMicroLocations first (most accurate zone labels)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mlModule = require("../data/bangaloreMicroLocations") as {
+      bangaloreMicroLocations?: Array<{
+        name: string;
+        zone: string;
+        lat: number;
+        lng: number;
+        zoneLabel?: string;
+        parentArea?: string;
+      }>;
+    };
+    const locs = mlModule.bangaloreMicroLocations ?? [];
+
+    // Exact name match (case-insensitive)
+    let match = locs.find((l) => l.name.toLowerCase() === key);
+    // Partial match
+    if (!match) {
+      match = locs.find(
+        (l) =>
+          l.name.toLowerCase().includes(key) ||
+          key.includes(l.name.toLowerCase()),
+      );
+    }
+
+    if (match) {
+      const zone = getLocalityZone(match.name);
+      const zoneLabel =
+        match.zoneLabel ??
+        (match.parentArea && match.parentArea !== "Bangalore"
+          ? match.parentArea
+          : (LOCALITY_ZONE_LABELS[zone] ?? "Bangalore"));
+      return { zone, zoneLabel, lat: match.lat, lng: match.lng };
+    }
+  } catch {
+    /* silent */
+  }
+
+  // Fall back to LOCALITY_COORDS_MAP
+  const coords = getLocalityCoords(locality);
+  if (coords) {
+    const zone = getLocalityZone(locality);
+    return {
+      zone,
+      zoneLabel: LOCALITY_ZONE_LABELS[zone] ?? "Bangalore",
+      lat: coords.lat,
+      lng: coords.lng,
+    };
+  }
+
+  return null;
 }
 
 /** Returns median PSF for a zone (used for cluster-level fallback). */

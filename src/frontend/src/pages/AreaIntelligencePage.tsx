@@ -33,6 +33,7 @@ import AnalyzingOverlay from "../components/AnalyzingOverlay";
 import GlobalMapComponent, {
   type DynamicPoiPin,
 } from "../components/GlobalMapComponent";
+import MapLevelSelector from "../components/MapLevelSelector";
 import { ConnectivityScoreCard } from "../components/area/ConnectivityScoreCard";
 import { EmploymentEngineCard } from "../components/area/EmploymentEngineCard";
 import { FullGeoIntelligenceCard } from "../components/area/FullGeoIntelligenceCard";
@@ -48,22 +49,38 @@ import {
 } from "../engines/areaIntelligenceEngine";
 import {
   type InfraItem,
+  getTopATMs,
+  getTopBanks,
   getTopBusStops,
   getTopHospitals,
   getTopMalls,
+  getTopPetrolPumps,
+  getTopPharmacies,
+  getTopPoliceStations,
   getTopRailwayStations,
+  getTopRestaurants,
   getTopSchools,
+  getTopSupermarkets,
   getTopTechParks,
 } from "../engines/infraEngine";
 import { computeInvestmentIntelligence } from "../engines/investmentIntelligenceEngine";
+import {
+  APARTMENT_SUBTYPE_PSF_MULTIPLIERS,
+  APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS,
+  type ApartmentSubType,
+  computeLocationScores,
+  filterByLevel,
+} from "../engines/locationScoringEngine";
+import type { LevelType } from "../engines/mapLayersEngine";
 import { type MetroResult, getNearestMetros } from "../engines/metroEngine";
+import { getPollutionData } from "../engines/pollutionEngine";
 import { computePriceForecast } from "../engines/priceForecastEngine";
 import { computeValuBrixScore } from "../engines/valuBrixScoreEngine";
 import {
   getBaseMedianPSF,
   getBasePSF,
   getLocalityCoords,
-  getLocalityZone,
+  getLocalityZoneLabel,
 } from "../utils/localityEngine";
 import { getLocalityRentMetrics } from "../utils/rentEngine";
 
@@ -1081,6 +1098,7 @@ export default function AreaIntelligencePage() {
     locality?: string;
     city?: string;
     propertyType?: string;
+    apartmentSubType?: string;
     lat?: string;
     lng?: string;
   };
@@ -1088,6 +1106,14 @@ export default function AreaIntelligencePage() {
   const locality = searchParams.locality || "Whitefield";
   const city = searchParams.city || "Bangalore";
   const propertyType = searchParams.propertyType;
+  // Read apartmentSubType from URL — validated to allowed values only
+  const rawSubType = searchParams.apartmentSubType;
+  const urlApartmentSubType: ApartmentSubType | undefined =
+    rawSubType === "standalone" ||
+    rawSubType === "gated" ||
+    rawSubType === "township"
+      ? rawSubType
+      : undefined;
   const lat = searchParams.lat ? Number(searchParams.lat) : undefined;
   const lng = searchParams.lng ? Number(searchParams.lng) : undefined;
 
@@ -1095,6 +1121,15 @@ export default function AreaIntelligencePage() {
   const [activeTypeFilter, setActiveTypeFilter] = useState<
     "apartment" | "villa" | "plot" | null
   >(null);
+
+  // In-page apartment sub-type selection (when not passed via URL)
+  const [activeApartmentSubType, setActiveApartmentSubType] = useState<
+    ApartmentSubType | undefined
+  >(urlApartmentSubType);
+
+  // Effective sub-type: URL param wins, then in-page selection
+  const effectiveSubType: ApartmentSubType | undefined =
+    urlApartmentSubType ?? activeApartmentSubType;
 
   // Effective type = URL param > active filter button > null (blended)
   // Normalize URL property type to only allowed 3 types
@@ -1106,9 +1141,30 @@ export default function AreaIntelligencePage() {
       : null;
   const effectiveType = normalizedPropertyType ?? activeTypeFilter;
 
+  // ── Sub-type-specific PSF benchmark ─────────────────────────────────────────
+  // When apartment is selected with a sub-type, apply the corresponding multiplier.
+  // Township PSF > Gated PSF > Standalone PSF (consistent with AI Valuation engine).
+  const effectiveApartmentSubTypeMultiplier: number =
+    effectiveType === "apartment" && effectiveSubType
+      ? APARTMENT_SUBTYPE_PSF_MULTIPLIERS[effectiveSubType]
+      : 1.0;
+
+  // Label for sub-type in result cards
+  const SUBTYPE_LABELS: Record<ApartmentSubType, string> = {
+    standalone: "Standalone Apartment",
+    gated: "Gated Community",
+    township: "Township",
+  };
+
   // ── Compute all intelligence (memoized) ─────────────────────────────────────
   const psf = useMemo(() => getBaseMedianPSF(locality), [locality]);
-  const zone = useMemo(() => getLocalityZone(locality), [locality]);
+  const zoneLabel = useMemo(() => getLocalityZoneLabel(locality), [locality]);
+
+  // Pollution data — zone-based AQI estimate for this locality
+  const pollutionData = useMemo(
+    () => getPollutionData(locality, zoneLabel),
+    [locality, zoneLabel],
+  );
 
   // Task 2: All-type intelligence (for overview cards when no type selected)
   const allTypeIntel = useMemo<AllPropertyTypeIntelligence>(
@@ -1123,24 +1179,10 @@ export default function AreaIntelligencePage() {
   }, [locality, effectiveType]);
 
   const areaIntel = useMemo(() => {
-    // Priority: URL lat/lng → localityCoords data lookup → getLocalityCoords → zone-based fallback
+    // Use same coordinate resolution as localityCoords — no zone-based fallbacks
     const lookupCoords = getCoords(locality) ?? getLocalityCoords(locality);
-    const coordLat =
-      lat ??
-      lookupCoords?.lat ??
-      (zone === "east-core"
-        ? 12.9698
-        : zone === "north-inner"
-          ? 13.0358
-          : 12.97);
-    const coordLng =
-      lng ??
-      lookupCoords?.lng ??
-      (zone === "east-core"
-        ? 77.7499
-        : zone === "north-inner"
-          ? 77.597
-          : 77.64);
+    const coordLat = lat ?? lookupCoords?.lat ?? 0;
+    const coordLng = lng ?? lookupCoords?.lng ?? 0;
     // R2: pass normalizedPropertyType so engine can return blended mode when not selected
     return getAreaIntelligence(
       locality,
@@ -1148,7 +1190,7 @@ export default function AreaIntelligencePage() {
       coordLng,
       normalizedPropertyType ?? undefined,
     );
-  }, [locality, lat, lng, zone, normalizedPropertyType]);
+  }, [locality, lat, lng, normalizedPropertyType]);
 
   const priceForecast = useMemo(
     () => computePriceForecast(locality, normalizedPropertyType ?? undefined),
@@ -1271,12 +1313,22 @@ export default function AreaIntelligencePage() {
   const [osrmBusStops, setOsrmBusStops] = useState<InfraItem[]>([]);
   const [topMalls, setTopMalls] = useState<InfraItem[]>([]);
   const [airportDist, setAirportDist] = useState<InfraItem | null>(null);
+  const [osrmPolice, setOsrmPolice] = useState<InfraItem[]>([]);
+  const [osrmPetrolPumps, setOsrmPetrolPumps] = useState<InfraItem[]>([]);
+  const [osrmPharmacies, setOsrmPharmacies] = useState<InfraItem[]>([]);
+  const [osrmSupermarkets, setOsrmSupermarkets] = useState<InfraItem[]>([]);
+  const [osrmRestaurants, setOsrmRestaurants] = useState<InfraItem[]>([]);
+  const [osrmBanks, setOsrmBanks] = useState<InfraItem[]>([]);
+  const [osrmATMs, setOsrmATMs] = useState<InfraItem[]>([]);
   const [osrmLoading, setOsrmLoading] = useState(true);
 
   // FIX 4: Default to "metro" so map shows pins on initial load (not null/empty)
   const [activeMapCategory, setActiveMapCategory] = useState<string | null>(
     "metro",
   );
+
+  // Level selector state — Smart/Premium/Growth/Investment filter for area map
+  const [mapLevel, setMapLevel] = useState<LevelType>("smart");
 
   // Fetch all POIs via OSRM when source coords change
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — only re-run when source coords change
@@ -1336,42 +1388,42 @@ export default function AreaIntelligencePage() {
 
         // Steps 2-8: sequential with 80ms gap between each call
         const techParks = await sequentialFetch(
-          () => getTopTechParks(safeLat, safeLng, 5),
+          () => getTopTechParks(safeLat, safeLng),
           [] as InfraItem[],
         );
         if (cancelled) return;
         setOsrmTechParks(techParks);
 
         const hospitals = await sequentialFetch(
-          () => getTopHospitals(safeLat, safeLng, 5),
+          () => getTopHospitals(safeLat, safeLng),
           [] as InfraItem[],
         );
         if (cancelled) return;
         setOsrmHospitals(hospitals);
 
         const schools = await sequentialFetch(
-          () => getTopSchools(safeLat, safeLng, 5),
+          () => getTopSchools(safeLat, safeLng),
           [] as InfraItem[],
         );
         if (cancelled) return;
         setOsrmSchools(schools);
 
         const railway = await sequentialFetch(
-          () => getTopRailwayStations(safeLat, safeLng, 5),
+          () => getTopRailwayStations(safeLat, safeLng),
           [] as InfraItem[],
         );
         if (cancelled) return;
         setOsrmRailway(railway);
 
         const busStops = await sequentialFetch(
-          () => getTopBusStops(safeLat, safeLng, 5),
+          () => getTopBusStops(safeLat, safeLng),
           [] as InfraItem[],
         );
         if (cancelled) return;
         setOsrmBusStops(busStops);
 
         const malls = await sequentialFetch(
-          () => getTopMalls(safeLat, safeLng, 3),
+          () => getTopMalls(safeLat, safeLng),
           [] as InfraItem[],
         );
         if (cancelled) return;
@@ -1380,7 +1432,7 @@ export default function AreaIntelligencePage() {
         const airports = await sequentialFetch(
           () =>
             import("../engines/infraEngine").then(({ getTopAirports }) =>
-              getTopAirports(safeLat, safeLng, 1),
+              getTopAirports(safeLat, safeLng),
             ),
           [] as InfraItem[],
         );
@@ -1391,6 +1443,56 @@ export default function AreaIntelligencePage() {
         console.log(
           `[Area Intelligence] Fetched ${metros.length} metros, ${busStops.length} bus stops, ${techParks.length} tech parks, ${hospitals.length} hospitals, ${schools.length} schools, ${railway.length} railway`,
         );
+
+        // Fetch new POI categories sequentially (lower priority — after core POIs)
+        const police = await sequentialFetch(
+          () => getTopPoliceStations(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmPolice(police);
+
+        const petrolPumps = await sequentialFetch(
+          () => getTopPetrolPumps(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmPetrolPumps(petrolPumps);
+
+        const pharmacies = await sequentialFetch(
+          () => getTopPharmacies(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmPharmacies(pharmacies);
+
+        const supermarkets = await sequentialFetch(
+          () => getTopSupermarkets(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmSupermarkets(supermarkets);
+
+        const restaurants = await sequentialFetch(
+          () => getTopRestaurants(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmRestaurants(restaurants);
+
+        const banks = await sequentialFetch(
+          () => getTopBanks(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmBanks(banks);
+
+        const atms = await sequentialFetch(
+          () => getTopATMs(safeLat, safeLng),
+          [] as InfraItem[],
+        );
+        if (cancelled) return;
+        setOsrmATMs(atms);
 
         // Ensure map shows metro pins by default on load
         setActiveMapCategory((prev) => prev ?? "metro");
@@ -1590,6 +1692,62 @@ export default function AreaIntelligencePage() {
       distanceKm: m.osrmKm ?? undefined,
       durationMins: m.osrmDurationMins ?? undefined,
     }));
+    const allPolicePins: DynamicPoiPin[] = osrmPolice.map((p) => ({
+      category: "police",
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      distanceKm: p.osrmKm ?? undefined,
+      durationMins: p.osrmDurationMins ?? undefined,
+    }));
+    const allPetrolPins: DynamicPoiPin[] = osrmPetrolPumps.map((p) => ({
+      category: "petrol_pump",
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      distanceKm: p.osrmKm ?? undefined,
+      durationMins: p.osrmDurationMins ?? undefined,
+    }));
+    const allPharmacyPins: DynamicPoiPin[] = osrmPharmacies.map((p) => ({
+      category: "pharmacy",
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      distanceKm: p.osrmKm ?? undefined,
+      durationMins: p.osrmDurationMins ?? undefined,
+    }));
+    const allSupermarketPins: DynamicPoiPin[] = osrmSupermarkets.map((s) => ({
+      category: "supermarket",
+      name: s.name,
+      lat: s.lat,
+      lng: s.lng,
+      distanceKm: s.osrmKm ?? undefined,
+      durationMins: s.osrmDurationMins ?? undefined,
+    }));
+    const allRestaurantPins: DynamicPoiPin[] = osrmRestaurants.map((r) => ({
+      category: "restaurant",
+      name: r.name,
+      lat: r.lat,
+      lng: r.lng,
+      distanceKm: r.osrmKm ?? undefined,
+      durationMins: r.osrmDurationMins ?? undefined,
+    }));
+    const allBankPins: DynamicPoiPin[] = osrmBanks.map((b) => ({
+      category: "bank",
+      name: b.name,
+      lat: b.lat,
+      lng: b.lng,
+      distanceKm: b.osrmKm ?? undefined,
+      durationMins: b.osrmDurationMins ?? undefined,
+    }));
+    const allATMPins: DynamicPoiPin[] = osrmATMs.map((a) => ({
+      category: "atm",
+      name: a.name,
+      lat: a.lat,
+      lng: a.lng,
+      distanceKm: a.osrmKm ?? undefined,
+      durationMins: a.osrmDurationMins ?? undefined,
+    }));
 
     // Null = "All" → combine all categories (capped per category for clarity)
     if (!activeMapCategory) {
@@ -1601,6 +1759,9 @@ export default function AreaIntelligencePage() {
         ...allRailwayPins.slice(0, 2),
         ...allBusPins.slice(0, 2),
         ...allMallPins.slice(0, 1),
+        ...allPolicePins.slice(0, 1),
+        ...allPetrolPins.slice(0, 1),
+        ...allPharmacyPins.slice(0, 1),
       ];
       console.log(
         `[Area Intelligence] Map pins count: ${combined.length} (category: all)`,
@@ -1631,6 +1792,27 @@ export default function AreaIntelligencePage() {
       case "mall":
         pins = allMallPins;
         break;
+      case "police":
+        pins = allPolicePins;
+        break;
+      case "petrol_pump":
+        pins = allPetrolPins;
+        break;
+      case "pharmacy":
+        pins = allPharmacyPins;
+        break;
+      case "supermarket":
+        pins = allSupermarketPins;
+        break;
+      case "restaurant":
+        pins = allRestaurantPins;
+        break;
+      case "bank":
+        pins = allBankPins;
+        break;
+      case "atm":
+        pins = allATMPins;
+        break;
       default:
         break;
     }
@@ -1648,7 +1830,178 @@ export default function AreaIntelligencePage() {
     osrmBusStops,
     osrmTechParks,
     topMalls,
+    osrmPolice,
+    osrmPetrolPumps,
+    osrmPharmacies,
+    osrmSupermarkets,
+    osrmRestaurants,
+    osrmBanks,
+    osrmATMs,
   ]);
+
+  // ── Level-filtered POI pins — applies Smart/Premium/Growth/Investment scoring ─
+  // Scores each pin by its category characteristics, then filters/sorts by mapLevel.
+  // Smart (default) = all pins sorted by score (no cutoff, shows everything).
+  // Premium/Growth/Investment = top 60% by respective score (min 3).
+  const levelFilteredPins = useMemo<DynamicPoiPin[]>(() => {
+    if (dynamicPoiPins.length === 0) return dynamicPoiPins;
+
+    // Category-level scoring heuristics (data-driven from category characteristics)
+    // These translate each POI type into infrastructure/amenity/growth signals.
+    const categoryScores: Record<
+      string,
+      {
+        infraScore: number;
+        amenityScore: number;
+        growthScore: number;
+        connectivity: number;
+      }
+    > = {
+      metro: {
+        infraScore: 1.0,
+        amenityScore: 0.7,
+        growthScore: 0.9,
+        connectivity: 1.0,
+      },
+      railway: {
+        infraScore: 0.9,
+        amenityScore: 0.6,
+        growthScore: 0.85,
+        connectivity: 0.95,
+      },
+      tech_park: {
+        infraScore: 0.8,
+        amenityScore: 0.5,
+        growthScore: 1.0,
+        connectivity: 0.85,
+      },
+      hospital: {
+        infraScore: 0.7,
+        amenityScore: 0.9,
+        growthScore: 0.5,
+        connectivity: 0.6,
+      },
+      school: {
+        infraScore: 0.6,
+        amenityScore: 0.85,
+        growthScore: 0.5,
+        connectivity: 0.55,
+      },
+      mall: {
+        infraScore: 0.5,
+        amenityScore: 1.0,
+        growthScore: 0.6,
+        connectivity: 0.7,
+      },
+      bus_stop: {
+        infraScore: 0.5,
+        amenityScore: 0.4,
+        growthScore: 0.4,
+        connectivity: 0.7,
+      },
+      restaurant: {
+        infraScore: 0.3,
+        amenityScore: 0.8,
+        growthScore: 0.3,
+        connectivity: 0.4,
+      },
+      pharmacy: {
+        infraScore: 0.4,
+        amenityScore: 0.75,
+        growthScore: 0.3,
+        connectivity: 0.35,
+      },
+      supermarket: {
+        infraScore: 0.4,
+        amenityScore: 0.8,
+        growthScore: 0.35,
+        connectivity: 0.4,
+      },
+      bank: {
+        infraScore: 0.5,
+        amenityScore: 0.6,
+        growthScore: 0.4,
+        connectivity: 0.45,
+      },
+      atm: {
+        infraScore: 0.3,
+        amenityScore: 0.5,
+        growthScore: 0.25,
+        connectivity: 0.3,
+      },
+      police: {
+        infraScore: 0.5,
+        amenityScore: 0.4,
+        growthScore: 0.3,
+        connectivity: 0.4,
+      },
+      petrol_pump: {
+        infraScore: 0.35,
+        amenityScore: 0.45,
+        growthScore: 0.25,
+        connectivity: 0.35,
+      },
+    };
+
+    // Use distanceKm as a PSF proxy: closer = higher land value signal
+    // (shorter distance to amenity → higher area-level PSF)
+    const maxDist = Math.max(
+      ...dynamicPoiPins.map((p) => p.distanceKm ?? 5),
+      1,
+    );
+    const allPSFs = dynamicPoiPins.map((p) => {
+      const dist = p.distanceKm ?? maxDist;
+      return Math.round(7000 + (1 - dist / maxDist) * 6000); // 7k–13k range
+    });
+
+    const inputs = dynamicPoiPins.map((pin, i) => {
+      const dist = pin.distanceKm ?? maxDist;
+      const scores = categoryScores[pin.category] ?? {
+        infraScore: 0.5,
+        amenityScore: 0.5,
+        growthScore: 0.5,
+        connectivity: 0.5,
+      };
+      // Closer = higher score bonus; distance-weighted all sub-scores
+      const proximityBonus = Math.max(0, 1 - dist / maxDist) * 0.3;
+      return {
+        name: pin.name,
+        lat: pin.lat,
+        lng: pin.lng,
+        psf: allPSFs[i],
+        infraScore: Math.min(1, scores.infraScore + proximityBonus),
+        amenityScore: Math.min(1, scores.amenityScore + proximityBonus),
+        growthScore: Math.min(1, scores.growthScore + proximityBonus * 0.5),
+        connectivityScore: Math.min(1, scores.connectivity + proximityBonus),
+      };
+    });
+
+    const scored = computeLocationScores(
+      inputs,
+      undefined,
+      effectiveType === "apartment" ? effectiveSubType : undefined,
+    );
+
+    if (mapLevel === "smart") {
+      // Smart: show all pins sorted by smart score (no hard cutoff)
+      const sortedScored = [...scored].sort(
+        (a, b) => b.scores.smart - a.scores.smart,
+      );
+      return sortedScored
+        .map(
+          (s) =>
+            dynamicPoiPins.find((p) => p.name === s.name && p.lat === s.lat) ??
+            dynamicPoiPins[0],
+        )
+        .filter(Boolean) as DynamicPoiPin[];
+    }
+
+    const filtered = filterByLevel(scored, mapLevel);
+    const filteredKeys = new Set(filtered.map((s) => `${s.name}::${s.lat}`));
+    return dynamicPoiPins.filter((p) =>
+      filteredKeys.has(`${p.name}::${p.lat}`),
+    );
+  }, [dynamicPoiPins, mapLevel, effectiveType, effectiveSubType]);
 
   // ── Analyzing overlay + animated entrance ────────────────────────────────────
   const [showAnalyzing, setShowAnalyzing] = useState(true);
@@ -1763,7 +2116,7 @@ export default function AreaIntelligencePage() {
             <p className="text-white/50 text-sm mb-4">
               Zone:{" "}
               <span className="text-white/70 font-medium capitalize">
-                {zone.replace(/-/g, " ")}
+                {zoneLabel}
               </span>
               {propertyType && (
                 <>
@@ -1779,15 +2132,24 @@ export default function AreaIntelligencePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 {
-                  label: effectiveType
-                    ? `${effectiveType.charAt(0).toUpperCase() + effectiveType.slice(1)} Base PSF`
-                    : "Base Market PSF",
-                  tooltip: effectiveType
-                    ? `PSF = Price per square foot. This is the ${effectiveType} PSF from verified registry transactions for this locality.`
-                    : "PSF = Price per square foot. Weighted median across all property types for this locality.",
-                  value: effectiveType
-                    ? `₹${getBasePSF(locality, effectiveType).toLocaleString("en-IN")}`
-                    : `₹${psf.toLocaleString("en-IN")}`,
+                  label:
+                    effectiveType === "apartment" && effectiveSubType
+                      ? `${SUBTYPE_LABELS[effectiveSubType]} PSF`
+                      : effectiveType
+                        ? `${effectiveType.charAt(0).toUpperCase() + effectiveType.slice(1)} Base PSF`
+                        : "Base Market PSF",
+                  tooltip:
+                    effectiveType === "apartment" && effectiveSubType
+                      ? `${SUBTYPE_LABELS[effectiveSubType]} benchmark PSF — applies ${effectiveSubType === "township" ? "1.15×" : effectiveSubType === "gated" ? "1.00×" : "0.90×"} multiplier on base apartment PSF for this locality.`
+                      : effectiveType
+                        ? `PSF = Price per square foot. This is the ${effectiveType} PSF from verified registry transactions for this locality.`
+                        : "PSF = Price per square foot. Weighted median across all property types for this locality.",
+                  value:
+                    effectiveType === "apartment" && effectiveSubType
+                      ? `₹${Math.round(getBasePSF(locality, effectiveType) * effectiveApartmentSubTypeMultiplier).toLocaleString("en-IN")}`
+                      : effectiveType
+                        ? `₹${getBasePSF(locality, effectiveType).toLocaleString("en-IN")}`
+                        : `₹${psf.toLocaleString("en-IN")}`,
                   color: GOLD,
                 },
                 {
@@ -1847,6 +2209,168 @@ export default function AreaIntelligencePage() {
           </div>
         </div>
 
+        {/* ── Apartment Sub-Type Selector ──────────────────────────────────────────
+            Shown when property type = apartment (from URL or in-page filter).
+            Mandatory for sub-type-specific PSF and scoring.
+        ──────────────────────────────────────────────────────────────────────── */}
+        {effectiveType === "apartment" && (
+          <div
+            className="px-4 md:px-8 pb-4"
+            data-ocid="area_intel.apartment_subtype.section"
+          >
+            <div
+              className="max-w-4xl mx-auto rounded-2xl p-4 md:p-5"
+              style={{
+                background: "rgba(96,165,250,0.06)",
+                border: "1px solid rgba(96,165,250,0.2)",
+                backdropFilter: "blur(12px)",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <span style={{ color: "#60a5fa" }}>
+                  <Building size={16} />
+                </span>
+                <p
+                  className="font-bold text-sm"
+                  style={{
+                    color: "#F4F7FF",
+                    fontFamily: "'Playfair Display', serif",
+                  }}
+                >
+                  Apartment Type
+                  <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>
+                </p>
+                <p className="text-white/40 text-xs ml-1">
+                  — select for sub-type specific PSF & scoring
+                </p>
+              </div>
+              <div
+                className="grid grid-cols-3 gap-3"
+                data-ocid="area_intel.apartment_subtype.cards"
+              >
+                {(
+                  [
+                    {
+                      value: "standalone" as ApartmentSubType,
+                      label: "Standalone Apartment",
+                      description: "No society, independent building",
+                      emoji: "🏢",
+                      multiplier: "0.90×",
+                      multiplierColor: "#94a3b8",
+                    },
+                    {
+                      value: "gated" as ApartmentSubType,
+                      label: "Gated Community",
+                      description: "Perimeter wall, security, common amenities",
+                      emoji: "🏘️",
+                      multiplier: "1.00×",
+                      multiplierColor: GOLD,
+                    },
+                    {
+                      value: "township" as ApartmentSubType,
+                      label: "Township",
+                      description: "Self-contained with schools, retail, parks",
+                      emoji: "🌆",
+                      multiplier: "1.15×",
+                      multiplierColor: "#10b981",
+                    },
+                  ] as const
+                ).map((opt) => {
+                  const isSelected = effectiveSubType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setActiveApartmentSubType(opt.value)}
+                      data-ocid={`area_intel.apartment_subtype.card.${opt.value}`}
+                      className="flex flex-col items-start gap-2 p-3 md:p-4 rounded-xl transition-all duration-200 text-left"
+                      style={{
+                        background: isSelected
+                          ? "rgba(96,165,250,0.10)"
+                          : "rgba(255,255,255,0.03)",
+                        border: isSelected
+                          ? "2px solid rgba(96,165,250,0.55)"
+                          : "2px solid rgba(255,255,255,0.07)",
+                        boxShadow: isSelected
+                          ? "0 0 18px rgba(96,165,250,0.14)"
+                          : "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <span style={{ fontSize: 18 }}>{opt.emoji}</span>
+                        <span
+                          className="font-bold flex-1 text-xs leading-tight"
+                          style={{
+                            color: isSelected ? "#60a5fa" : "#F4F7FF",
+                          }}
+                        >
+                          {opt.label}
+                        </span>
+                        {isSelected && (
+                          <div
+                            className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ background: "#60a5fa" }}
+                          >
+                            <span
+                              style={{
+                                color: "#071A2F",
+                                fontSize: 9,
+                                fontWeight: 900,
+                              }}
+                            >
+                              ✓
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <p
+                        className="text-[10px] leading-snug"
+                        style={{ color: "rgba(185,198,216,0.55)" }}
+                      >
+                        {opt.description}
+                      </p>
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background: `${opt.multiplierColor}15`,
+                          color: opt.multiplierColor,
+                          border: `1px solid ${opt.multiplierColor}30`,
+                        }}
+                      >
+                        PSF {opt.multiplier}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Sub-type PSF benchmark — shown once selected */}
+              {effectiveSubType && (
+                <div
+                  className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(96,165,250,0.15)",
+                  }}
+                  data-ocid="area_intel.apartment_subtype.psf_benchmark"
+                >
+                  <span className="text-white/50 text-xs">
+                    {SUBTYPE_LABELS[effectiveSubType]} benchmark PSF:
+                  </span>
+                  <span className="font-bold text-base" style={{ color: GOLD }}>
+                    ₹
+                    {Math.round(
+                      getBasePSF(locality, "apartment") *
+                        effectiveApartmentSubTypeMultiplier,
+                    ).toLocaleString("en-IN")}
+                    /sqft
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Main scrolling content ────────────────────────────────────────────── */}
         <div
           className={`max-w-4xl mx-auto px-4 md:px-8 py-8 space-y-6 ${fadeCls}`}
@@ -1896,6 +2420,21 @@ export default function AreaIntelligencePage() {
                   { key: "tech_park", label: "💼 Tech Park", color: "#EAB308" },
                   { key: "bus_stop", label: "🚌 Bus Stop", color: "#F97316" },
                   { key: "mall", label: "🛍️ Mall", color: "#EC4899" },
+                  { key: "police", label: "🚔 Police", color: "#1D4ED8" },
+                  { key: "petrol_pump", label: "⛽ Petrol", color: "#D97706" },
+                  { key: "pharmacy", label: "💊 Pharmacy", color: "#059669" },
+                  {
+                    key: "supermarket",
+                    label: "🛒 Supermarket",
+                    color: "#7C3AED",
+                  },
+                  {
+                    key: "restaurant",
+                    label: "🍽️ Restaurant",
+                    color: "#DC2626",
+                  },
+                  { key: "bank", label: "🏦 Bank", color: "#065F46" },
+                  { key: "atm", label: "🏧 ATM", color: "#0369A1" },
                 ] as const
               ).map((btn) => {
                 const isActive = activeMapCategory === btn.key;
@@ -1930,15 +2469,22 @@ export default function AreaIntelligencePage() {
                 Loading nearby places…
               </p>
             )}
-            {!osrmLoading && activeMapCategory && dynamicPoiPins.length > 0 && (
-              <p className="text-white/40 text-xs mb-3">
-                Showing {dynamicPoiPins.length}{" "}
-                {activeMapCategory === null
-                  ? "nearby places"
-                  : activeMapCategory.replace("_", " ")}{" "}
-                near {locality}
-              </p>
-            )}
+            {!osrmLoading &&
+              activeMapCategory &&
+              levelFilteredPins.length > 0 && (
+                <p className="text-white/40 text-xs mb-3">
+                  Showing {levelFilteredPins.length}{" "}
+                  {activeMapCategory === null
+                    ? "nearby places"
+                    : activeMapCategory.replace("_", " ")}{" "}
+                  near {locality}
+                  {mapLevel !== "smart" && (
+                    <span className="ml-1 text-white/30">
+                      · filtered by {mapLevel} score
+                    </span>
+                  )}
+                </p>
+              )}
             {!osrmLoading && !localityCoords.hasRealCoords && (
               <p className="text-amber-400/70 text-xs mb-3 flex items-center gap-1.5">
                 <span>⚠</span>
@@ -1958,6 +2504,21 @@ export default function AreaIntelligencePage() {
                 overflow: "hidden",
               }}
             >
+              {/* Level selector — positioned inside map wrapper, top-left */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  zIndex: 1002,
+                }}
+              >
+                <MapLevelSelector
+                  selectedLevel={mapLevel}
+                  onLevelChange={setMapLevel}
+                  data-ocid="area_intel.map.level_selector"
+                />
+              </div>
               <GlobalMapComponent
                 mode="area-intelligence"
                 center={[
@@ -1966,15 +2527,16 @@ export default function AreaIntelligencePage() {
                 ]}
                 zoom={13}
                 height="340px"
-                showLayerToggle={false}
+                showLayerToggle={true}
                 hideLevelSelector={true}
                 hideInfraPanel={true}
-                hideInfraLegend={true}
+                hideInfraLegend={false}
                 hideClickHint={true}
                 hideSmartPinsLegend={true}
                 disableDefaultSmartPins={true}
-                dynamicPoiPins={dynamicPoiPins}
+                dynamicPoiPins={levelFilteredPins}
                 activePoiCategory={activeMapCategory ?? undefined}
+                pollutionData={pollutionData}
                 onLocationSelect={(lat, lng, name) => {
                   // handled internally
                   void lat;
@@ -2271,15 +2833,15 @@ export default function AreaIntelligencePage() {
         ════════════════════════════════════════════════════════════════════ */}
           <div className="grid md:grid-cols-2 gap-6">
             <ConnectivityScoreCard
-              lat={localityCoords.mapDisplayLat}
-              lng={localityCoords.mapDisplayLng}
+              lat={localityCoords.coordLat ?? 0}
+              lng={localityCoords.coordLng ?? 0}
               locality={locality}
               metros={osrmMetros}
               airportOsrmKm={airportKm}
             />
             <EmploymentEngineCard
-              lat={localityCoords.mapDisplayLat}
-              lng={localityCoords.mapDisplayLng}
+              lat={localityCoords.coordLat ?? 0}
+              lng={localityCoords.coordLng ?? 0}
               locality={locality}
             />
           </div>
@@ -2287,20 +2849,41 @@ export default function AreaIntelligencePage() {
           <div className="grid md:grid-cols-2 gap-6">
             <GrowthSignalsCard
               locality={locality}
-              lat={localityCoords.mapDisplayLat}
-              lng={localityCoords.mapDisplayLng}
+              lat={localityCoords.coordLat ?? 0}
+              lng={localityCoords.coordLng ?? 0}
               priceTrend1Y={areaIntel.priceTrend1Y}
               priceTrend3Y={areaIntel.priceTrend3Y}
               classification={areaIntel.classification}
+              subTypeGrowthAdj={
+                effectiveType === "apartment" && effectiveSubType
+                  ? APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS[effectiveSubType].growth
+                  : 0
+              }
+              subTypeLabel={
+                effectiveType === "apartment" && effectiveSubType
+                  ? SUBTYPE_LABELS[effectiveSubType]
+                  : undefined
+              }
             />
             <LiveabilityScoreCard
-              lat={localityCoords.mapDisplayLat}
-              lng={localityCoords.mapDisplayLng}
+              lat={localityCoords.coordLat ?? 0}
+              lng={localityCoords.coordLng ?? 0}
               locality={locality}
               isLoading={osrmLoading}
               schools={osrmSchools}
               hospitals={osrmHospitals}
               malls={topMalls}
+              subTypeLivabilityAdj={
+                effectiveType === "apartment" && effectiveSubType
+                  ? APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS[effectiveSubType]
+                      .livability
+                  : 0
+              }
+              subTypeLabel={
+                effectiveType === "apartment" && effectiveSubType
+                  ? SUBTYPE_LABELS[effectiveSubType]
+                  : undefined
+              }
             />
           </div>
 
@@ -3203,6 +3786,241 @@ export default function AreaIntelligencePage() {
           </GlassCard>
 
           {/* ═══════════════════════════════════════════════════════════════════
+            SECTION 7B — Air Quality (Pollution Layer)
+        ════════════════════════════════════════════════════════════════════ */}
+          <GlassCard
+            data-ocid="area_intel.pollution.section"
+            accentColor={pollutionData.color}
+          >
+            <SectionHeader
+              icon={
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+                </svg>
+              }
+              title="Air Quality"
+              badge={pollutionData.category}
+            />
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* AQI gauge + category badge */}
+              <div className="flex flex-col gap-4">
+                {/* AQI hero number */}
+                <div className="flex items-end gap-3">
+                  <div>
+                    <p className="text-white/40 text-xs uppercase tracking-wide mb-0.5">
+                      AQI Score
+                    </p>
+                    <p
+                      className="text-4xl font-bold"
+                      style={{
+                        color: pollutionData.color,
+                        fontFamily: "'Playfair Display', serif",
+                      }}
+                    >
+                      {pollutionData.aqi}
+                    </p>
+                  </div>
+                  {/* Category pill */}
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold mb-1"
+                    style={{
+                      background: `${pollutionData.color}18`,
+                      border: `1px solid ${pollutionData.color}40`,
+                      color: pollutionData.color,
+                    }}
+                    data-ocid="area_intel.pollution.category_badge"
+                  >
+                    {pollutionData.category === "Good" && "✅"}
+                    {pollutionData.category === "Moderate" && "🟡"}
+                    {pollutionData.category === "Poor" && "🟠"}
+                    {pollutionData.category === "Unhealthy" && "🔴"}
+                    {pollutionData.category === "Severe" && "🟣"}
+                    {pollutionData.category}
+                  </span>
+                </div>
+
+                {/* AQI progress bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-white/40">
+                    <span>Good (0)</span>
+                    <span>Severe (400+)</span>
+                  </div>
+                  <div
+                    className="h-2.5 rounded-full overflow-hidden"
+                    style={{ background: "rgba(255,255,255,0.08)" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${Math.min(100, (pollutionData.aqi / 400) * 100)}%`,
+                        background:
+                          "linear-gradient(90deg, #10B981, #F59E0B, #F97316, #EF4444, #7C3AED)",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Air quality score */}
+                <div
+                  className="rounded-xl p-3 flex items-center justify-between"
+                  style={{
+                    background: `${pollutionData.color}0A`,
+                    border: `1px solid ${pollutionData.color}25`,
+                  }}
+                >
+                  <span className="text-white/50 text-sm">
+                    Air Quality Score
+                  </span>
+                  <span
+                    className="font-bold text-lg"
+                    style={{ color: pollutionData.color }}
+                  >
+                    {pollutionData.score}/100
+                  </span>
+                </div>
+
+                <p className="text-white/30 text-xs">
+                  Estimates based on CPCB data & zone patterns. Actual AQI may
+                  vary seasonally.
+                </p>
+              </div>
+
+              {/* Pollutant breakdown */}
+              <div className="space-y-3">
+                <p className="text-white/40 text-xs uppercase tracking-wide mb-2">
+                  Pollutant Estimates
+                </p>
+
+                {[
+                  {
+                    label: "PM2.5",
+                    value: `${pollutionData.pm25} µg/m³`,
+                    sublabel: "Fine particles (WHO limit: 15 µg/m³)",
+                    threshold:
+                      pollutionData.pm25 > 60
+                        ? "High"
+                        : pollutionData.pm25 > 25
+                          ? "Moderate"
+                          : "Low",
+                    color:
+                      pollutionData.pm25 > 60
+                        ? "#EF4444"
+                        : pollutionData.pm25 > 25
+                          ? "#F59E0B"
+                          : "#10B981",
+                  },
+                  {
+                    label: "PM10",
+                    value: `${pollutionData.pm10} µg/m³`,
+                    sublabel: "Coarse particles (WHO limit: 45 µg/m³)",
+                    threshold:
+                      pollutionData.pm10 > 100
+                        ? "High"
+                        : pollutionData.pm10 > 50
+                          ? "Moderate"
+                          : "Low",
+                    color:
+                      pollutionData.pm10 > 100
+                        ? "#EF4444"
+                        : pollutionData.pm10 > 50
+                          ? "#F59E0B"
+                          : "#10B981",
+                  },
+                  ...(pollutionData.no2 !== undefined
+                    ? [
+                        {
+                          label: "NO₂",
+                          value: `${pollutionData.no2} µg/m³`,
+                          sublabel: "Nitrogen dioxide (WHO limit: 25 µg/m³)",
+                          threshold:
+                            pollutionData.no2 > 80
+                              ? "High"
+                              : pollutionData.no2 > 40
+                                ? "Moderate"
+                                : "Low",
+                          color:
+                            pollutionData.no2 > 80
+                              ? "#EF4444"
+                              : pollutionData.no2 > 40
+                                ? "#F59E0B"
+                                : "#10B981",
+                        },
+                      ]
+                    : []),
+                ].map((p) => (
+                  <div
+                    key={p.label}
+                    className="rounded-xl px-4 py-3 flex items-center justify-between"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}
+                  >
+                    <div>
+                      <p className="text-white/80 text-sm font-semibold">
+                        {p.label}
+                      </p>
+                      <p className="text-white/30 text-xs">{p.sublabel}</p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className="font-bold text-sm"
+                        style={{ color: p.color }}
+                      >
+                        {p.value}
+                      </p>
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background: `${p.color}18`,
+                          color: p.color,
+                          border: `1px solid ${p.color}30`,
+                        }}
+                      >
+                        {p.threshold}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Environmental tip */}
+                <div
+                  className="rounded-xl p-3 mt-2"
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderLeft: `3px solid ${pollutionData.color}60`,
+                  }}
+                >
+                  <p className="text-white/50 text-xs leading-relaxed">
+                    {pollutionData.category === "Good" &&
+                      "Excellent air quality. This locality has good ventilation and low pollution sources nearby."}
+                    {pollutionData.category === "Moderate" &&
+                      "Air quality is acceptable. Sensitive individuals may experience mild discomfort on some days."}
+                    {pollutionData.category === "Poor" &&
+                      "Air quality may cause health effects for sensitive groups. Consider proximity to parks and green belts."}
+                    {pollutionData.category === "Unhealthy" &&
+                      "Industrial or high-traffic zone. Air quality may affect health. Look for properties with air filtration or green cover."}
+                    {pollutionData.category === "Severe" &&
+                      "Significant pollution levels. This zone has major industrial or traffic sources. Factor air quality into investment decision."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* ═══════════════════════════════════════════════════════════════════
             SECTION 8 — ValuBrix Score
         ════════════════════════════════════════════════════════════════════ */}
           <GlassCard
@@ -3525,7 +4343,7 @@ export default function AreaIntelligencePage() {
 
           {/* Footer credit */}
           <p className="text-center text-white/20 text-xs pb-4">
-            AI Research Report ·{" "}
+            AI Research Report · Build v1.2.0 ·{" "}
             {new Date().toLocaleDateString("en-IN", {
               month: "long",
               year: "numeric",

@@ -107,6 +107,24 @@ export const AILearningSubmission = IDL.Record({
   'notes' : IDL.Text,
   'locality' : IDL.Text,
 });
+export const BankerStatus = IDL.Variant({
+  'pending' : IDL.Null,
+  'approved' : IDL.Null,
+  'rejected' : IDL.Null,
+});
+export const BankerApplication = IDL.Record({
+  'id' : IDL.Nat,
+  'org' : IDL.Text,
+  'status' : BankerStatus,
+  'appliedAt' : IDL.Int,
+  'principal' : IDL.Principal,
+  'city' : IDL.Text,
+  'name' : IDL.Text,
+  'reviewNote' : IDL.Text,
+  'reviewedAt' : IDL.Opt(IDL.Int),
+  'email' : IDL.Text,
+  'mobile' : IDL.Text,
+});
 export const UserProfile = IDL.Record({
   'password_hash' : IDL.Opt(IDL.Text),
   'username' : IDL.Text,
@@ -250,6 +268,40 @@ export const LeadInput = IDL.Record({
   'budget' : IDL.Text,
   'location' : IDL.Text,
 });
+export const ApartmentSubType = IDL.Variant({
+  'township' : IDL.Null,
+  'gated' : IDL.Null,
+  'standalone' : IDL.Null,
+  'unknown' : IDL.Null,
+});
+export const ValuationRequest = IDL.Record({
+  'age' : IDL.Nat,
+  'propertyType' : IDL.Text,
+  'sqft' : IDL.Nat,
+  'builderName' : IDL.Opt(IDL.Text),
+  'apartmentSubType' : IDL.Opt(ApartmentSubType),
+  'locality' : IDL.Text,
+  'amenitiesCount' : IDL.Nat,
+});
+export const ValuationResult = IDL.Record({
+  'comparablesUsed' : IDL.Nat,
+  'subTypeMultiplier' : IDL.Nat,
+  'pricePerSqft' : IDL.Nat,
+  'infraContribution' : IDL.Nat,
+  'metroContribution' : IDL.Nat,
+  'locationContribution' : IDL.Nat,
+  'confidenceReason' : IDL.Text,
+  'subTypeApplied' : IDL.Text,
+  'builderApplied' : IDL.Text,
+  'demandContribution' : IDL.Nat,
+  'bestPrice' : IDL.Nat,
+  'comparablesContribution' : IDL.Nat,
+  'priceMax' : IDL.Nat,
+  'priceMin' : IDL.Nat,
+  'confidence' : IDL.Nat,
+  'localityFound' : IDL.Bool,
+  'builderMultiplier' : IDL.Nat,
+});
 export const http_header = IDL.Record({
   'value' : IDL.Text,
   'name' : IDL.Text,
@@ -304,6 +356,7 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'approveBankOfficer' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'cleanupOldData' : IDL.Func([IDL.Nat], [IDL.Text], []),
   'computeValuation' : IDL.Func(
@@ -359,6 +412,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(AILearningSubmission)],
       ['query'],
     ),
+  'getAllBankerApps' : IDL.Func([], [IDL.Vec(BankerApplication)], ['query']),
   'getAllPublishedListings' : IDL.Func(
       [],
       [IDL.Vec(PropertyListing)],
@@ -390,6 +444,8 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getMetroInfo' : IDL.Func([IDL.Text], [MetroInfo], ['query']),
+  'getMyBankerStatus' : IDL.Func([], [IDL.Text], ['query']),
+  'getPendingBankers' : IDL.Func([], [IDL.Vec(BankerApplication)], ['query']),
   'getPriceHistory' : IDL.Func([IDL.Text], [IDL.Vec(PriceSnapshot)], ['query']),
   'getRentalIntelligence' : IDL.Func([IDL.Text], [RentalResponse], ['query']),
   'getReraProjects' : IDL.Func([], [IDL.Vec(ReraProject)], ['query']),
@@ -420,6 +476,11 @@ export const idlService = IDL.Service({
   'markLeadContacted' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'publishListing' : IDL.Func([IDL.Nat], [], []),
   'recordDailySnapshot' : IDL.Func([IDL.Text], [IDL.Text], []),
+  'registerBankOfficer' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
   'registerUser' : IDL.Func(
       [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
       [],
@@ -430,6 +491,7 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
+  'rejectBankOfficer' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
   'runValidationTests' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'saveAILearningSubmission' : IDL.Func([AILearningInput], [IDL.Text], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
@@ -455,6 +517,11 @@ export const idlService = IDL.Service({
       [IDL.Text, IDL.Nat, IDL.Text, IDL.Nat],
       [IDL.Text],
       [],
+    ),
+  'submitValuation' : IDL.Func(
+      [ValuationRequest],
+      [ValuationResult],
+      ['query'],
     ),
   'trackFeedback' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'transform' : IDL.Func(
@@ -609,6 +676,24 @@ export const idlFactory = ({ IDL }) => {
     'notes' : IDL.Text,
     'locality' : IDL.Text,
   });
+  const BankerStatus = IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  });
+  const BankerApplication = IDL.Record({
+    'id' : IDL.Nat,
+    'org' : IDL.Text,
+    'status' : BankerStatus,
+    'appliedAt' : IDL.Int,
+    'principal' : IDL.Principal,
+    'city' : IDL.Text,
+    'name' : IDL.Text,
+    'reviewNote' : IDL.Text,
+    'reviewedAt' : IDL.Opt(IDL.Int),
+    'email' : IDL.Text,
+    'mobile' : IDL.Text,
+  });
   const UserProfile = IDL.Record({
     'password_hash' : IDL.Opt(IDL.Text),
     'username' : IDL.Text,
@@ -752,6 +837,40 @@ export const idlFactory = ({ IDL }) => {
     'budget' : IDL.Text,
     'location' : IDL.Text,
   });
+  const ApartmentSubType = IDL.Variant({
+    'township' : IDL.Null,
+    'gated' : IDL.Null,
+    'standalone' : IDL.Null,
+    'unknown' : IDL.Null,
+  });
+  const ValuationRequest = IDL.Record({
+    'age' : IDL.Nat,
+    'propertyType' : IDL.Text,
+    'sqft' : IDL.Nat,
+    'builderName' : IDL.Opt(IDL.Text),
+    'apartmentSubType' : IDL.Opt(ApartmentSubType),
+    'locality' : IDL.Text,
+    'amenitiesCount' : IDL.Nat,
+  });
+  const ValuationResult = IDL.Record({
+    'comparablesUsed' : IDL.Nat,
+    'subTypeMultiplier' : IDL.Nat,
+    'pricePerSqft' : IDL.Nat,
+    'infraContribution' : IDL.Nat,
+    'metroContribution' : IDL.Nat,
+    'locationContribution' : IDL.Nat,
+    'confidenceReason' : IDL.Text,
+    'subTypeApplied' : IDL.Text,
+    'builderApplied' : IDL.Text,
+    'demandContribution' : IDL.Nat,
+    'bestPrice' : IDL.Nat,
+    'comparablesContribution' : IDL.Nat,
+    'priceMax' : IDL.Nat,
+    'priceMin' : IDL.Nat,
+    'confidence' : IDL.Nat,
+    'localityFound' : IDL.Bool,
+    'builderMultiplier' : IDL.Nat,
+  });
   const http_header = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const http_request_result = IDL.Record({
     'status' : IDL.Nat,
@@ -803,6 +922,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'approveBankOfficer' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'cleanupOldData' : IDL.Func([IDL.Nat], [IDL.Text], []),
     'computeValuation' : IDL.Func(
@@ -858,6 +978,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(AILearningSubmission)],
         ['query'],
       ),
+    'getAllBankerApps' : IDL.Func([], [IDL.Vec(BankerApplication)], ['query']),
     'getAllPublishedListings' : IDL.Func(
         [],
         [IDL.Vec(PropertyListing)],
@@ -901,6 +1022,8 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getMetroInfo' : IDL.Func([IDL.Text], [MetroInfo], ['query']),
+    'getMyBankerStatus' : IDL.Func([], [IDL.Text], ['query']),
+    'getPendingBankers' : IDL.Func([], [IDL.Vec(BankerApplication)], ['query']),
     'getPriceHistory' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(PriceSnapshot)],
@@ -935,6 +1058,11 @@ export const idlFactory = ({ IDL }) => {
     'markLeadContacted' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'publishListing' : IDL.Func([IDL.Nat], [], []),
     'recordDailySnapshot' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'registerBankOfficer' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
     'registerUser' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text],
         [],
@@ -945,6 +1073,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'rejectBankOfficer' : IDL.Func([IDL.Nat, IDL.Text], [IDL.Bool], []),
     'runValidationTests' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'saveAILearningSubmission' : IDL.Func([AILearningInput], [IDL.Text], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
@@ -978,6 +1107,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text, IDL.Nat, IDL.Text, IDL.Nat],
         [IDL.Text],
         [],
+      ),
+    'submitValuation' : IDL.Func(
+        [ValuationRequest],
+        [ValuationResult],
+        ['query'],
       ),
     'trackFeedback' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'transform' : IDL.Func(

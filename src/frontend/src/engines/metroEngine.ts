@@ -161,8 +161,8 @@ export const METROS: Metro[] = [
   {
     name: "Nagasandra",
     line: "Green",
-    lat: 13.0618,
-    lng: 77.5128,
+    lat: 13.0541,
+    lng: 77.5564,
     operational: true,
   },
   {
@@ -175,7 +175,7 @@ export const METROS: Metro[] = [
   {
     name: "Yeshwanthpur",
     line: "Green",
-    lat: 13.0245,
+    lat: 13.0284,
     lng: 77.5554,
     operational: true,
   },

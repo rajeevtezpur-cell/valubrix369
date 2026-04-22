@@ -4,143 +4,11 @@ import ProjectLinkedDropdown from "../components/ProjectLinkedDropdown";
 import { BANGALORE_PROJECTS } from "../data/bangaloreProjects";
 import { filterBuildersByLocality } from "../utils/projectFilter";
 
+import GlobalMapComponent from "../components/GlobalMapComponent";
 import LocationConfirmModal from "../components/LocationConfirmModal";
 import type { ReverseGeocodeResult } from "../utils/localReverseGeocode";
 import { reverseGeocodeLocally } from "../utils/localReverseGeocode";
 
-declare global {
-  interface Window {
-    L: any;
-  }
-}
-
-function loadLeafletForMap(): Promise<any> {
-  return new Promise((resolve, reject) => {
-    if (window.L) {
-      resolve(window.L);
-      return;
-    }
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    if (!document.getElementById("leaflet-js")) {
-      const script = document.createElement("script");
-      script.id = "leaflet-js";
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => resolve(window.L);
-      script.onerror = () => reject(new Error("Failed to load Leaflet"));
-      document.head.appendChild(script);
-    } else {
-      const interval = setInterval(() => {
-        if (window.L) {
-          clearInterval(interval);
-          resolve(window.L);
-        }
-      }, 50);
-      setTimeout(() => {
-        clearInterval(interval);
-        reject(new Error("timeout"));
-      }, 10000);
-    }
-  });
-}
-
-// ListingMapPin — uses CartoDB Voyager light tiles (same as GlobalMapComponent)
-function ListingMapPin({
-  coords,
-  onChange,
-  onDragEnd,
-}: {
-  coords: [number, number];
-  onChange: (c: [number, number]) => void;
-  onDragEnd?: (c: [number, number]) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
-  const initCoordsRef = useRef(coords);
-  const onChangeRef = useRef(onChange);
-  const onDragEndRef = useRef(onDragEnd);
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-  useEffect(() => {
-    onDragEndRef.current = onDragEnd;
-  }, [onDragEnd]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function init() {
-      try {
-        const L = await loadLeafletForMap();
-        if (cancelled || !containerRef.current) return;
-        const [initLat, initLng] = initCoordsRef.current;
-        const map = L.map(containerRef.current, {
-          scrollWheelZoom: false,
-        }).setView([initLat, initLng], 13);
-        mapRef.current = map;
-        // CartoDB Voyager light tiles — matches GlobalMapComponent across all portals
-        L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-          {
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: "abcd",
-            maxZoom: 19,
-          },
-        ).addTo(map);
-        const icon = L.divIcon({
-          className: "",
-          html: '<div style="width:28px;height:28px;background:#D4AF37;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>',
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        });
-        const marker = L.marker([initLat, initLng], {
-          icon,
-          draggable: true,
-        }).addTo(map);
-        markerRef.current = marker;
-        marker.on("dragend", (e: any) => {
-          const ll = e.target.getLatLng();
-          const newCoords: [number, number] = [ll.lat, ll.lng];
-          onChangeRef.current(newCoords);
-          onDragEndRef.current?.(newCoords);
-        });
-        map.on("click", (e: any) => {
-          const { lat, lng } = e.latlng;
-          const newCoords: [number, number] = [lat, lng];
-          marker.setLatLng(newCoords);
-          onChangeRef.current(newCoords);
-          onDragEndRef.current?.(newCoords);
-        });
-        for (const d of [100, 500]) setTimeout(() => map?.invalidateSize(), d);
-      } catch {
-        // map init failed
-      }
-    }
-    init();
-    return () => {
-      cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (markerRef.current && mapRef.current) {
-      markerRef.current.setLatLng(coords);
-      mapRef.current.setView(coords, mapRef.current.getZoom());
-    }
-  }, [coords]);
-
-  return <div ref={containerRef} style={{ width: "100%", height: "100%" }} />;
-}
 import {
   AlertTriangle,
   Check,
@@ -965,13 +833,14 @@ export default function ListPropertyPage() {
                         className="rounded-xl overflow-hidden border border-white/10"
                         style={{ height: 240 }}
                       >
-                        <ListingMapPin
-                          coords={pinCoords}
-                          onChange={() => {}}
-                          onDragEnd={(c) => {
-                            // Use local reverse geocoding — no external API
+                        <GlobalMapComponent
+                          mode="select-location"
+                          height="240px"
+                          center={pinCoords}
+                          showLayerToggle={false}
+                          onLocationSelect={(lat, lng) => {
+                            const c: [number, number] = [lat, lng];
                             const geo = reverseGeocodeLocally(c[0], c[1]);
-                            // Always show confirmation modal after pin drop
                             setGeoConfirm(geo);
                           }}
                         />

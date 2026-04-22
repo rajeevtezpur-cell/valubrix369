@@ -4827,3 +4827,43 @@ export function getAllLocationNames(): string[] {
     .map((l) => l.name)
     .sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * getZoneLabelForLocality — look up the zone label for a location name.
+ *
+ * Uses bangaloreMicroLocations data first (has stored zoneLabel/parentArea).
+ * Falls back to re-exporting localityEngine's getLocalityZoneLabel.
+ *
+ * This is the function all portals should call when displaying the zone
+ * of a user-selected location — no reverse geocoding needed.
+ *
+ * @param name  Location name from the dropdown (case-insensitive)
+ * @returns     Human-readable zone label, never "Unknown"
+ */
+export function getZoneLabelForLocality(name: string): string {
+  const lower = name.toLowerCase().trim();
+  // Exact name match
+  let loc = bangaloreMicroLocations.find((l) => l.name.toLowerCase() === lower);
+  // Partial match
+  if (!loc) {
+    loc = bangaloreMicroLocations.find(
+      (l) =>
+        l.name.toLowerCase().includes(lower) ||
+        lower.includes(l.name.toLowerCase()),
+    );
+  }
+  if (loc) {
+    if (loc.zoneLabel) return loc.zoneLabel;
+    // Map enum zone to readable label
+    const zoneMap: Record<string, string> = {
+      North: "North Bangalore",
+      South: "South Bangalore",
+      East: "East Bangalore",
+      West: "West Bangalore",
+      Central: "Central Bangalore",
+    };
+    return zoneMap[loc.zone] ?? loc.parentArea ?? "Bangalore";
+  }
+  // No match in local data — return generic
+  return "Bangalore";
+}

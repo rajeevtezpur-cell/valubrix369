@@ -24,6 +24,11 @@ import RENT_TRAINING_DATA, {
 import { TECH_PARKS } from "../engines/infraEngine";
 import { haversineDistance } from "../engines/metroEngine";
 import { getActiveListingsForBuyer } from "../services/listingService";
+import {
+  type PropertyTypeKey,
+  loadWeights,
+  saveWeights,
+} from "../services/modelWeightsStore";
 import { getBaseMicroLocationPSF } from "./localityEngine";
 
 // ─── Batch epoch ranges (inferred timestamps for directional trend only) ─────
@@ -444,6 +449,99 @@ function getAllSamples(): RentSample[] {
 
 export function invalidateRentCache(): void {
   _cachedSamples = null;
+}
+
+// ─── Rental model weight persistence ─────────────────────────────────────────
+//
+// After computing derived rental features (furnishing premiums, BHK curves, etc.)
+// for a given property type, save them to modelWeightsStore so they can be
+// restored on the next page load without recomputation.
+// The rental "weights" are the computed per-locality feature factors.
+
+const RENT_MODEL_VERSION = 4; // bump to invalidate cached rental weights
+
+function buildRentalWeightSnapshot(
+  propertyType: PropertyTypeKey,
+  allSamples: RentSample[],
+): void {
+  try {
+    const grouped = groupByLocality(allSamples);
+    const localityPSFCache: Record<string, number> = {};
+    for (const [loc, samps] of grouped) {
+      if (samps.length >= 3) {
+        const psf = weightedMedianPsf(samps);
+        if (psf > 0) localityPSFCache[loc] = psf;
+      }
+    }
+    const sampleCount = allSamples.filter((s) => !s.isSynthetic).length;
+    saveWeights(propertyType, "rent", "global", {
+      coefficients: [],
+      intercept: 0,
+      featureNames: [`rent_v${RENT_MODEL_VERSION}`],
+      r2Score: 0,
+      sampleCount,
+      trainedAt: Date.now(),
+      mae: 0,
+      rmse: 0,
+      localityPSFCache,
+      builderPremiumCache: {},
+    });
+  } catch {
+    // persistence errors must never block inference
+  }
+}
+
+/**
+ * Returns cached rental PSF for a locality and property type if available.
+ * Returns null if not cached or stale.
+ */
+export function getCachedRentalPSF(
+  locality: string,
+  propertyType: PropertyTypeKey,
+): number | null {
+  try {
+    const cached = loadWeights(propertyType, "rent", "global");
+    if (!cached) return null;
+    if (!cached.weights.featureNames.includes(`rent_v${RENT_MODEL_VERSION}`))
+      return null;
+    const key = locality.trim().toLowerCase();
+    return cached.weights.localityPSFCache[key] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Initialize rental weight snapshot at module load time (non-blocking)
+if (typeof window !== "undefined") {
+  const initRentalWeights = () => {
+    try {
+      const samples = getAllSamples();
+      // Build snapshots for each property type (apartment, villa, commercial)
+      for (const pt of [
+        "apartment",
+        "villa",
+        "commercial",
+      ] as PropertyTypeKey[]) {
+        const typeSamples = samples.filter(
+          (s) =>
+            s.propertyType === pt ||
+            (pt === "apartment" && s.propertyType === "flat"),
+        );
+        if (typeSamples.length >= 3) {
+          buildRentalWeightSnapshot(pt, typeSamples);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+  if ("requestIdleCallback" in window) {
+    (window as Window & typeof globalThis).requestIdleCallback(
+      initRentalWeights,
+    );
+  } else {
+    setTimeout(initRentalWeights, 0);
+  }
 }
 
 // ─── Grouping & median utilities ──────────────────────────────────────────────

@@ -11,6 +11,22 @@ type AILearningSubmission__117392513 =
     soldPrice : Float;
     submittedAt : Int
   };
+type BankerApplication__630110657 =
+  {
+    appliedAt : Int;
+    city : Text;
+    email : Text;
+    id : Nat;
+    mobile : Text;
+    name : Text;
+    org : Text;
+    principal : Principal;
+    reviewNote : Text;
+    reviewedAt : ?Int;
+    status : BankerStatus__597695482
+  };
+type BankerApplication__919784467 = BankerApplication__630110657;
+type BankerStatus__597695482 = {#approved; #pending; #rejected};
 type Data__159895909<T> = {var count : Nat__490723111; elements : [var ?T]};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
@@ -239,6 +255,11 @@ actor {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?_MigAreaIntelligence__815566601]];
       var elementIndex : Nat__490723111
+    };
+  stable bankerAppsState :
+    {
+      var bankerAppCounter : Nat;
+      var bankerApps : Map__605269027<Nat, BankerApplication__919784467>
     };
   stable cities :
     {var root : Node__92254746<Text>; var size : Nat__490723111};

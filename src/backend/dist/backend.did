@@ -22,6 +22,26 @@ type _ImmutableObjectStorageCreateCertificateResult =
    blob_hash: text;
    method: text;
  };
+type ValuationResult = 
+ record {
+   bestPrice: nat;
+   builderApplied: text;
+   builderMultiplier: nat;
+   comparablesContribution: nat;
+   comparablesUsed: nat;
+   confidence: nat;
+   confidenceReason: text;
+   demandContribution: nat;
+   infraContribution: nat;
+   localityFound: bool;
+   locationContribution: nat;
+   metroContribution: nat;
+   priceMax: nat;
+   priceMin: nat;
+   pricePerSqft: nat;
+   subTypeApplied: text;
+   subTypeMultiplier: nat;
+ };
 type ValuationResponse = 
  record {
    bestPrice: nat;
@@ -31,6 +51,16 @@ type ValuationResponse =
    localityFound: bool;
    priceMax: nat;
    priceMin: nat;
+ };
+type ValuationRequest = 
+ record {
+   age: nat;
+   amenitiesCount: nat;
+   apartmentSubType: opt ApartmentSubType;
+   builderName: opt text;
+   locality: text;
+   propertyType: text;
+   sqft: nat;
  };
 type ValuationReport = 
  record {
@@ -269,6 +299,33 @@ type DealScoreResponse =
    liquidityScore: nat;
    priceGap: int;
  };
+type BankerStatus = 
+ variant {
+   approved;
+   pending;
+   rejected;
+ };
+type BankerApplication = 
+ record {
+   appliedAt: int;
+   city: text;
+   email: text;
+   id: nat;
+   mobile: text;
+   name: text;
+   org: text;
+   "principal": principal;
+   reviewNote: text;
+   reviewedAt: opt int;
+   status: BankerStatus;
+ };
+type ApartmentSubType = 
+ variant {
+   gated;
+   standalone;
+   township;
+   unknown;
+ };
 type AILearningSubmission = 
  record {
    area: float64;
@@ -304,6 +361,7 @@ service : {
   addPriceSnapshot: (locality: text, price: nat) -> (text);
   addValuationReport: (location: text, propertyType: PropertyType,
    estimatedMin: nat, estimatedMax: nat, confidence: nat) -> (nat);
+  approveBankOfficer: (id: nat, note: text) -> (bool);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   cleanupOldData: (maxAgeDays: nat) -> (text);
   computeValuation: (locality: text, propertyType: text, sqft: nat, age: 
@@ -322,6 +380,7 @@ service : {
   filterListings: (propertyType: PropertyType, minPrice: nat, maxPrice: 
    nat, bhk: nat) -> (vec PropertyListing) query;
   getAILearningSubmissions: () -> (vec AILearningSubmission) query;
+  getAllBankerApps: () -> (vec BankerApplication) query;
   getAllPublishedListings: () -> (vec PropertyListing) query;
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
@@ -339,6 +398,8 @@ service : {
   getLocalityList: () -> (vec text) query;
   getManualProjects: (locality: text) -> (vec ManualProjectEntry) query;
   getMetroInfo: (locality: text) -> (MetroInfo) query;
+  getMyBankerStatus: () -> (text) query;
+  getPendingBankers: () -> (vec BankerApplication) query;
   getPriceHistory: (locality: text) -> (vec PriceSnapshot) query;
   getRentalIntelligence: (locality: text) -> (RentalResponse) query;
   getReraProjects: () -> (vec ReraProject) query;
@@ -359,10 +420,13 @@ service : {
   markLeadContacted: (leadId: text) -> (bool);
   publishListing: (listingId: nat) -> ();
   recordDailySnapshot: (locality: text) -> (text);
+  registerBankOfficer: (name: text, email: text, mobile: text, org: text,
+   city: text) -> (nat);
   registerUser: (username: text, fullName: text, mobile: text, email: 
    text, city: text, panNumber: text) -> ();
   registerWithEmail: (emailHash: text, passwordHash: text, name: text) ->
    (text);
+  rejectBankOfficer: (id: nat, note: text) -> (bool);
   runValidationTests: () -> (vec text) query;
   saveAILearningSubmission: (input: AILearningInput) -> (text);
   saveCallerUserProfile: (profile: UserProfile) -> ();
@@ -381,6 +445,11 @@ service : {
    nat) -> (text);
   submitSaleRecord: (locality: text, sqft: nat, propertyType: text,
    soldPrice: nat) -> (text);
+  /// Extended valuation endpoint — accepts ValuationRequest, returns ValuationResult.
+  /// Uses the same core engine as computeValuation but layers in:
+  ///   1. Builder premium multiplier (clamped 0.90–1.40)
+  ///   2. Apartment sub-type multiplier (standalone < gated < township)
+  submitValuation: (req: ValuationRequest) -> (ValuationResult) query;
   trackFeedback: (listingId: nat, eventType: text) -> ();
   transform: (input: TransformationInput) -> (TransformationOutput) query;
   unsaveProperty: (listingId: nat) -> ();

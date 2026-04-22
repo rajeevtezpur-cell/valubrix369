@@ -26,7 +26,14 @@ export type POIType =
   | "college"
   | "mall"
   | "airport"
-  | "highway";
+  | "highway"
+  | "police"
+  | "petrol_pump"
+  | "pharmacy"
+  | "supermarket"
+  | "restaurant"
+  | "bank"
+  | "atm";
 
 // ─── Unified POI Interface ─────────────────────────────────────────────────────
 
@@ -445,6 +452,14 @@ export function getAllPOIsByType(type: POIType): POIEntry[] {
     case "hospital":
     case "school":
     case "tech_park":
+    // New categories — owned by infraEngine.ts
+    case "police":
+    case "petrol_pump":
+    case "pharmacy":
+    case "supermarket":
+    case "restaurant":
+    case "bank":
+    case "atm":
       return [];
   }
 }

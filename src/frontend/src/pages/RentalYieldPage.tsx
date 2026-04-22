@@ -1,11 +1,11 @@
-import { Home, MapPin, Shield, TrendingUp, Users, X } from "lucide-react";
+import { Home, MapPin, TrendingUp, Users, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import AuditPanel from "../components/AuditPanel";
 import BuyerLayout from "../components/BuyerLayout";
+import GlobalMapComponent from "../components/GlobalMapComponent";
 import LocalityDropdown from "../components/LocalityDropdown";
 import { fmtMonthlyRent as fmtRent } from "../utils/rentDisplay";
-import { reverseGeocode } from "../utils/reverseGeocode";
 
 // fmtRent imported from rentDisplay.ts
 
@@ -462,134 +462,6 @@ function LocalityCard({
   );
 }
 
-// @ts-nocheck
-function loadLeafletForRental(): Promise<void> {
-  return new Promise((resolve) => {
-    if (window.L) {
-      resolve();
-      return;
-    }
-    if (!document.getElementById("leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-    if (!document.getElementById("leaflet-js")) {
-      const script = document.createElement("script");
-      script.id = "leaflet-js";
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => resolve();
-      document.head.appendChild(script);
-    } else {
-      const check = () => {
-        if (window.L) resolve();
-        else setTimeout(check, 50);
-      };
-      check();
-    }
-  });
-}
-
-function RentalMapPanel({
-  localities,
-  selectedName,
-  onSelectLocality,
-}: {
-  localities: Locality[];
-  selectedName: string | null;
-  onSelectLocality: (name: string) => void;
-  onPinLocation?: (name: string, lat: number, lng: number) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: map init once
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-    let cancelled = false;
-    loadLeafletForRental().then(() => {
-      if (cancelled || !containerRef.current || mapRef.current) return;
-      const L = window.L;
-      L.Icon.Default.prototype._getIconUrl = undefined;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl:
-          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl:
-          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      });
-      const first = localities.find((l) => l.coords[0] && l.coords[1]);
-      const center = first ? first.coords : [12.9716, 77.5946];
-      const m = L.map(containerRef.current, {
-        zoomControl: true,
-        scrollWheelZoom: false,
-      }).setView(center, 11);
-      mapRef.current = m;
-      // CartoDB Voyager light tiles — matches GlobalMapComponent across all portals
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: "abcd",
-          maxZoom: 19,
-        },
-      ).addTo(m);
-      for (const d of [100, 300, 600]) setTimeout(() => m.invalidateSize(), d);
-    });
-    return () => {
-      cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markersRef.current = [];
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const lmap = mapRef.current;
-    if (!lmap || !window.L) return;
-    const L = window.L;
-    for (const mk of markersRef.current) lmap.removeLayer(mk);
-    markersRef.current = [];
-    for (const loc of localities) {
-      if (!loc.coords[0] || !loc.coords[1]) continue;
-      const isSelected = loc.name === selectedName;
-      const bg = isSelected ? "#D4AF37" : "#3b82f6";
-      const border = isSelected ? "#f5cc50" : "rgba(255,255,255,0.4)";
-      const icon = L.divIcon({
-        className: "",
-        html: `<div style="background:${bg};color:white;padding:3px 7px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap;border:2px solid ${border};box-shadow:0 2px 6px rgba(0,0,0,0.4)">${loc.name}<br/><span style="font-size:9px;opacity:0.85">${loc.yield}% yield</span></div>`,
-        iconAnchor: [0, 0],
-      });
-      const marker = L.marker(loc.coords, { icon }).addTo(lmap);
-      marker.on("click", () => onSelectLocality(loc.name));
-      markersRef.current.push(marker);
-    }
-    if (selectedName) {
-      const sel = localities.find((l) => l.name === selectedName);
-      if (sel?.coords[0]) lmap.setView(sel.coords, 13, { animate: true });
-    }
-  }, [localities, selectedName, onSelectLocality]);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        width: "100%",
-        height: "100%",
-        minHeight: 280,
-        borderRadius: 16,
-        overflow: "hidden",
-      }}
-    />
-  );
-}
-
 export default function RentalYieldPage() {
   const [sortBy, setSortBy] = useState<"yield" | "occupancy" | "rentMax">(
     "yield",
@@ -601,7 +473,6 @@ export default function RentalYieldPage() {
   const [noDataMessage, setNoDataMessage] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(getRecent);
-  const _inputRef = useRef<HTMLInputElement>(null);
 
   const matchedLocalities = query.trim()
     ? LOCALITIES.filter(
@@ -885,23 +756,31 @@ export default function RentalYieldPage() {
                   {noDataMessage}
                 </div>
               )}
-              <RentalMapPanel
-                localities={LOCALITIES}
-                selectedName={selectedName}
-                onSelectLocality={(name) => {
-                  setSelectedName(name);
-                  setQuery(name);
-                }}
-                onPinLocation={(name, _lat, _lng) => {
-                  if (name) {
-                    setSelectedName(name);
-                    setQuery(name);
+              <GlobalMapComponent
+                mode="explore"
+                height="300px"
+                center={
+                  selectedName
+                    ? (LOCALITIES.find((l) => l.name === selectedName)
+                        ?.coords ?? [12.9716, 77.5946])
+                    : [12.9716, 77.5946]
+                }
+                zoom={selectedName ? 13 : 11}
+                showLayerToggle={true}
+                onLocationSelect={(_lat, _lng, displayName) => {
+                  const match = LOCALITIES.find(
+                    (l) =>
+                      l.name.toLowerCase() === displayName.toLowerCase() ||
+                      displayName.toLowerCase().includes(l.name.toLowerCase()),
+                  );
+                  if (match) {
+                    setSelectedName(match.name);
+                    setQuery(match.name);
                     setNoDataMessage(null);
                   } else {
                     setNoDataMessage(
                       "No sufficient data for this micro-location",
                     );
-                    setSelectedName(null);
                   }
                 }}
               />

@@ -15,12 +15,12 @@ interface LegendEntry {
 }
 
 const LEGEND_DATA: Record<InfraLayerType, LegendEntry> = {
-  metro: { id: "metro", label: "Metro Station", color: "#3B82F6", emoji: "🚇" },
-  railway: { id: "railway", label: "Railway", color: "#6B7280", emoji: "🚆" },
+  metro: { id: "metro", label: "Metro Station", color: "#7C3AED", emoji: "🚇" },
+  railway: { id: "railway", label: "Railway", color: "#8B5CF6", emoji: "🚂" },
   bus_stop: {
     id: "bus_stop",
     label: "Bus Stop",
-    color: "#F59E0B",
+    color: "#3B82F6",
     emoji: "🚌",
   },
   hospital: {
@@ -34,12 +34,44 @@ const LEGEND_DATA: Record<InfraLayerType, LegendEntry> = {
   tech_park: {
     id: "tech_park",
     label: "Tech Park",
-    color: "#8B5CF6",
+    color: "#F59E0B",
     emoji: "🏢",
   },
-  mall: { id: "mall", label: "Mall", color: "#EC4899", emoji: "🛍" },
-  airport: { id: "airport", label: "Airport", color: "#06B6D4", emoji: "✈" },
-  highway: { id: "highway", label: "Highway", color: "#F97316", emoji: "🛣" },
+  mall: { id: "mall", label: "Mall", color: "#D97706", emoji: "🛍️" },
+  airport: { id: "airport", label: "Airport", color: "#6B7280", emoji: "✈️" },
+  highway: { id: "highway", label: "Highway", color: "#84CC16", emoji: "🛣️" },
+  police: {
+    id: "police",
+    label: "Police Station",
+    color: "#1E3A8A",
+    emoji: "🚔",
+  },
+  petrol_pump: {
+    id: "petrol_pump",
+    label: "Petrol Pump",
+    color: "#0D9488",
+    emoji: "⛽",
+  },
+  pharmacy: {
+    id: "pharmacy",
+    label: "Pharmacy",
+    color: "#EC4899",
+    emoji: "💊",
+  },
+  supermarket: {
+    id: "supermarket",
+    label: "Supermarket",
+    color: "#0D9488",
+    emoji: "🛒",
+  },
+  restaurant: {
+    id: "restaurant",
+    label: "Restaurant",
+    color: "#F97316",
+    emoji: "🍽️",
+  },
+  bank: { id: "bank", label: "Bank", color: "#6366F1", emoji: "🏦" },
+  atm: { id: "atm", label: "ATM", color: "#06B6D4", emoji: "🏧" },
 };
 
 interface MapInfrastructureLegendProps {

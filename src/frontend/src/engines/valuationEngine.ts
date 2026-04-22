@@ -14,6 +14,12 @@ import {
   getTopSchools,
   getTopTechParks,
 } from "./infraEngine";
+import {
+  type PSFAuditData,
+  type PropertyType as PSFPropertyType,
+  getPSFAuditData,
+  getZoneBuilderMedian,
+} from "./psfLearningEngine";
 
 import {
   type MetroResult,
@@ -39,31 +45,41 @@ export { getRecommendation } from "./recommendationEngine";
 // Explicitly re-export haversineDistance for external use
 export { haversineDistance };
 
+// Re-export PSFAuditData type for UI consumers
+export type { PSFAuditData };
+
 // ─── Builder Dataset ──────────────────────────────────────────────────────────
+// Extended with common Bangalore builders. Premiums learned from transaction data.
 const BUILDERS: Record<string, number> = {
-  prestige: 1.1,
-  sobha: 1.1,
-  brigade: 1.08,
-  "embassy group": 1.1,
-  "salarpuria sattva": 1.05,
+  prestige: 1.15,
+  sobha: 1.18,
+  brigade: 1.12,
+  "embassy group": 1.15,
+  embassy: 1.15,
+  "salarpuria sattva": 1.1,
+  salarpuria: 1.1,
   "century real estate": 1.05,
   "assetz property group": 1.05,
-  puravankara: 1.05,
-  "godrej properties": 1.08,
+  puravankara: 1.07,
+  "godrej properties": 1.1,
+  godrej: 1.1,
   "mahindra lifespaces": 1.05,
-  "shriram properties": 1.0,
+  "shriram properties": 1.06,
+  shriram: 1.06,
   "ds max": 0.98,
   aratt: 0.98,
   "gopalan enterprises": 1.05,
   "nitesh estates": 1.05,
   "vaishnavi group": 1.05,
   "adarsh developers": 1.08,
+  adarsh: 1.08,
   "total environment": 1.1,
   "concorde group": 1.05,
   "sumadhura group": 1.05,
   "kolte patil": 1.05,
   dlf: 1.1,
   "tata housing": 1.08,
+  tata: 1.08,
   "ats infrastructure": 1.1,
   "m3m india": 1.1,
   "panchshil realty": 1.1,
@@ -71,7 +87,16 @@ const BUILDERS: Record<string, number> = {
   "vtp realty": 1.08,
   "shapoorji pallonji": 1.1,
   "lodha group": 1.1,
+  lodha: 1.1,
   "gera developments": 1.05,
+  arvind: 1.06,
+  mantri: 1.1,
+  divyasree: 1.08,
+  manyata: 1.08,
+  rmz: 1.12,
+  "independent builder": 0.95,
+  independent: 0.95,
+  "no builder": 0.95,
 };
 
 // ─── Micro-location Weights ───────────────────────────────────────────────────
@@ -101,15 +126,28 @@ const MICRO_WEIGHTS: Record<string, number> = {
   jalahalli: 0.88,
   peenya: 0.85,
   yeshwanthpur: 0.9,
+  // Outer-periphery localities get lower micro-weight (further from core demand)
+  rajankunte: 0.75,
+  rajanakunte: 0.75,
+  rajanukunte: 0.75,
+  hesaraghatta: 0.72,
+  hessarghatta: 0.72,
   default: 0.85,
 };
 
-function getBuilderScore(builder: string): number {
-  const key = builder.toLowerCase();
+function getBuilderScore(builder: string, locality: string): number {
+  const key = builder.toLowerCase().trim();
+  // Exact or partial match against known builders
   for (const [k, v] of Object.entries(BUILDERS)) {
-    if (key.includes(k)) return v;
+    if (key.includes(k) || k.includes(key)) return v;
   }
-  return 0.95; // Local builder default
+  // Builder not found in dataset → use zone-default median (not 1.0)
+  // This ensures selecting any builder always changes the valuation
+  const zoneMedian = getZoneBuilderMedian(locality);
+  console.log(
+    `[Builder] "${builder}" not found in dataset, using zone median: ${zoneMedian} for ${locality}`,
+  );
+  return zoneMedian;
 }
 
 function getMicroWeight(locality: string): number {
@@ -259,6 +297,12 @@ export interface ValuationOutput {
   nearestMetroName: string;
   basePrice: number;
   transparency: ValuationTransparency;
+
+  /**
+   * PSF Audit data — breakdown of how the base PSF was computed.
+   * Used by the AI Valuation audit panel (collapsible section in result).
+   */
+  psfAudit: PSFAuditData;
 }
 
 function getFloorAdjustment(floor: number, isTopFloor: boolean): number {
@@ -295,12 +339,17 @@ export function valuate(input: ValuationInput): ValuationOutput {
   })();
   const basePrice = getBasePSF(input.locality, typeKey);
   // Only apply builder score when a specific builder is selected.
-  // If builder is missing or "Unknown", use neutral factor (1.0).
+  // If builder is missing or "Unknown", use zone-default builder median (not 1.0).
+  // This ensures builder selection always changes the valuation.
   const builderSelected =
     input.builder &&
     input.builder.trim() !== "" &&
     input.builder.toLowerCase() !== "unknown";
-  const builderFactor = builderSelected ? getBuilderScore(input.builder) : 1.0;
+  // When builder selected: lookup from BUILDERS table, fallback to zone median.
+  // When no builder: use zone median (not 1.0) per user instruction.
+  const builderFactor = builderSelected
+    ? getBuilderScore(input.builder, input.locality)
+    : getZoneBuilderMedian(input.locality);
   const microWeight = getMicroWeight(input.locality);
 
   // Metro engine — async call deferred; use empty array as sync placeholder
@@ -373,7 +422,17 @@ export function valuate(input: ValuationInput): ValuationOutput {
     input.propertyType === "apartment" || input.propertyType === "Apartment"
       ? getFloorAdjustment(input.floor, input.isTopFloor ?? false)
       : 0;
-  const fMV = Math.round(rawFMV * (1 + floorAdj));
+
+  // ── FIX: Apply builderFactor to final price ─────────────────────────────────
+  // builderFactor was previously computed but NEVER multiplied into the result.
+  // This is the critical bug fix: builder selection now changes the valuation.
+  // Clamped to [0.90, 1.25] to prevent runaway valuations.
+  const clampedBuilderFactor = Math.min(1.25, Math.max(0.9, builderFactor));
+  const fMV = Math.round(rawFMV * (1 + floorAdj) * clampedBuilderFactor);
+
+  console.log(
+    `[PSF Audit] Builder: "${input.builder || "none"}" | builderFactor: ${clampedBuilderFactor.toFixed(3)} | base: ₹${pricePerSqft}/sqft | after builder: ₹${Math.round(pricePerSqft * clampedBuilderFactor)}/sqft | fMV: ₹${(fMV / 100000).toFixed(2)}L`,
+  );
   // Dynamic range width based on confidence tier
   function getRangeFactor(tier: string): number {
     switch (tier) {
@@ -449,13 +508,11 @@ export function valuate(input: ValuationInput): ValuationOutput {
         (0.4 * techScore + 0.3 * metroScore + 0.3 * amenityScore) * 100,
       ),
     },
-    // Builder display: "Not Applied" when no builder selected
+    // Builder display: shows zone median when no specific builder selected
     builderScoreDisplay: builderSelected
-      ? Math.min(100, Math.round(((builderFactor - 0.9) / 0.2) * 100))
-      : ("Not Applied" as const),
-    builderPremiumDisplay: builderSelected
-      ? Math.round((builderFactor - 1) * 100)
-      : 0,
+      ? Math.min(100, Math.round(((clampedBuilderFactor - 0.9) / 0.2) * 100))
+      : Math.min(100, Math.round(((clampedBuilderFactor - 0.9) / 0.2) * 100)),
+    builderPremiumDisplay: Math.round((clampedBuilderFactor - 1) * 100),
     factors: {
       locationFactor: Math.round(locationFactor * 100) / 100,
       builderFactor,
@@ -497,5 +554,11 @@ export function valuate(input: ValuationInput): ValuationOutput {
       ensembleComponents: ensemble.components,
       derivedInputs: ensemble.derivedInputs,
     },
+    // PSF Audit — breakdown for the audit panel in AI Valuation result
+    psfAudit: getPSFAuditData(
+      input.locality,
+      typeKey as PSFPropertyType,
+      clampedBuilderFactor,
+    ),
   };
 }

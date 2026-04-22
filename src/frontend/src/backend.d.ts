@@ -19,6 +19,15 @@ export interface TransformationOutput {
     body: Uint8Array;
     headers: Array<http_header>;
 }
+export interface ValuationRequest {
+    age: bigint;
+    propertyType: string;
+    sqft: bigint;
+    builderName?: string;
+    apartmentSubType?: ApartmentSubType;
+    locality: string;
+    amenitiesCount: bigint;
+}
 export type Time = bigint;
 export interface ManualProjectEntry {
     name: string;
@@ -187,6 +196,25 @@ export interface http_header {
     value: string;
     name: string;
 }
+export interface ValuationResult {
+    comparablesUsed: bigint;
+    subTypeMultiplier: bigint;
+    pricePerSqft: bigint;
+    infraContribution: bigint;
+    metroContribution: bigint;
+    locationContribution: bigint;
+    confidenceReason: string;
+    subTypeApplied: string;
+    builderApplied: string;
+    demandContribution: bigint;
+    bestPrice: bigint;
+    comparablesContribution: bigint;
+    priceMax: bigint;
+    priceMin: bigint;
+    confidence: bigint;
+    localityFound: boolean;
+    builderMultiplier: bigint;
+}
 export interface http_request_result {
     status: bigint;
     body: Uint8Array;
@@ -225,6 +253,19 @@ export interface RentalResponse {
     rentalConfidence: bigint;
     vacancyRate: bigint;
 }
+export interface BankerApplication {
+    id: bigint;
+    org: string;
+    status: BankerStatus;
+    appliedAt: bigint;
+    principal: Principal;
+    city: string;
+    name: string;
+    reviewNote: string;
+    reviewedAt?: bigint;
+    email: string;
+    mobile: string;
+}
 export interface ValuationReport {
     id: bigint;
     propertyType: PropertyType;
@@ -248,6 +289,17 @@ export interface UserProfile {
     subscription_status: string;
     mobile: string;
 }
+export enum ApartmentSubType {
+    township = "township",
+    gated = "gated",
+    standalone = "standalone",
+    unknown_ = "unknown"
+}
+export enum BankerStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
+}
 export enum ListingStatus {
     published = "published",
     draft = "draft"
@@ -266,6 +318,7 @@ export interface backendInterface {
     addNewReraProjects(newProjects: Array<ReraProject>): Promise<boolean>;
     addPriceSnapshot(locality: string, price: bigint): Promise<string>;
     addValuationReport(location: string, propertyType: PropertyType, estimatedMin: bigint, estimatedMax: bigint, confidence: bigint): Promise<bigint>;
+    approveBankOfficer(id: bigint, note: string): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     cleanupOldData(maxAgeDays: bigint): Promise<string>;
     computeValuation(locality: string, propertyType: string, sqft: bigint, age: bigint, amenitiesCount: bigint): Promise<ValuationResponse>;
@@ -275,6 +328,7 @@ export interface backendInterface {
     deleteListing(listingId: bigint): Promise<void>;
     filterListings(propertyType: PropertyType, minPrice: bigint, maxPrice: bigint, bhk: bigint): Promise<Array<PropertyListing>>;
     getAILearningSubmissions(): Promise<Array<AILearningSubmission>>;
+    getAllBankerApps(): Promise<Array<BankerApplication>>;
     getAllPublishedListings(): Promise<Array<PropertyListing>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
@@ -290,6 +344,8 @@ export interface backendInterface {
     getLocalityList(): Promise<Array<string>>;
     getManualProjects(locality: string): Promise<Array<ManualProjectEntry>>;
     getMetroInfo(locality: string): Promise<MetroInfo>;
+    getMyBankerStatus(): Promise<string>;
+    getPendingBankers(): Promise<Array<BankerApplication>>;
     getPriceHistory(locality: string): Promise<Array<PriceSnapshot>>;
     getRentalIntelligence(locality: string): Promise<RentalResponse>;
     getReraProjects(): Promise<Array<ReraProject>>;
@@ -308,8 +364,10 @@ export interface backendInterface {
     markLeadContacted(leadId: string): Promise<boolean>;
     publishListing(listingId: bigint): Promise<void>;
     recordDailySnapshot(locality: string): Promise<string>;
+    registerBankOfficer(name: string, email: string, mobile: string, org: string, city: string): Promise<bigint>;
     registerUser(username: string, fullName: string, mobile: string, email: string, city: string, panNumber: string): Promise<void>;
     registerWithEmail(emailHash: string, passwordHash: string, name: string): Promise<string>;
+    rejectBankOfficer(id: bigint, note: string): Promise<boolean>;
     runValidationTests(): Promise<Array<string>>;
     saveAILearningSubmission(input: AILearningInput): Promise<string>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
@@ -324,6 +382,13 @@ export interface backendInterface {
     submitManualProject(name: string, locality: string): Promise<void>;
     submitSaleFeedback(locality: string, predictedPrice: bigint, actualPrice: bigint): Promise<string>;
     submitSaleRecord(locality: string, sqft: bigint, propertyType: string, soldPrice: bigint): Promise<string>;
+    /**
+     * / Extended valuation endpoint — accepts ValuationRequest, returns ValuationResult.
+     * / Uses the same core engine as computeValuation but layers in:
+     * /   1. Builder premium multiplier (clamped 0.90–1.40)
+     * /   2. Apartment sub-type multiplier (standalone < gated < township)
+     */
+    submitValuation(req: ValuationRequest): Promise<ValuationResult>;
     trackFeedback(listingId: bigint, eventType: string): Promise<void>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
     unsaveProperty(listingId: bigint): Promise<void>;

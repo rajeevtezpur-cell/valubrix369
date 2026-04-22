@@ -12,22 +12,29 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loggedIn, setLoggedIn] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // AuthContext admin/tester users bypass the legacy login gate
+    if (user && (user.role === "admin" || user.role === "tester")) {
+      navigate({ to: "/admin/dashboard" });
+      return;
+    }
     try {
       const s = localStorage.getItem("valubrix_admin");
       if (s) setLoggedIn(true);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [user, navigate]);
 
   const handleLogin = () => {
     if (username === "admin" && password === "admin123") {

@@ -10,9 +10,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import BankerPendingScreen from "../components/BankerPendingScreen";
 import GlobalMapComponent from "../components/GlobalMapComponent";
 import GlobalNav from "../components/GlobalNav";
 import { useAdmin } from "../context/AdminContext";
+import { useAuth } from "../context/AuthContext";
 
 type PageState = "login" | "otp" | "profile" | "pending" | "dashboard";
 
@@ -30,6 +32,7 @@ interface OfficerSession {
 export default function BankPortalPage() {
   const navigate = useNavigate();
   const { addBankOfficer, bankOfficers } = useAdmin();
+  const { user } = useAuth();
 
   const [pageState, setPageState] = useState<PageState>("login");
   const [orgId, setOrgId] = useState("");
@@ -73,6 +76,38 @@ export default function BankPortalPage() {
     const t = setTimeout(() => setTimer((prev) => prev - 1), 1000);
     return () => clearTimeout(t);
   }, [timer, timerActive]);
+
+  // FIX: If AuthContext user is banker with pending/rejected status, show appropriate screen
+  // All hooks are above this point so this is safe.
+  if (user && (user.role === "banker" || user.role === "bankOfficer")) {
+    if (user.bankOfficerStatus === "pending") return <BankerPendingScreen />;
+    if (user.bankOfficerStatus === "rejected") {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0A0F1F] to-[#121B35] px-4">
+          <GlobalNav />
+          <div
+            className="text-center rounded-2xl p-10 max-w-md w-full mt-20"
+            style={{
+              background: "rgba(239,68,68,0.06)",
+              border: "1px solid rgba(239,68,68,0.25)",
+            }}
+          >
+            <span style={{ fontSize: 40 }}>❌</span>
+            <h2
+              className="text-xl font-bold text-white mt-4 mb-2"
+              style={{ fontFamily: "'Playfair Display', serif" }}
+            >
+              Access Not Approved
+            </h2>
+            <p className="text-white/50 text-sm">
+              Your banker access request was not approved. Please contact
+              support for more information.
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }
 
   const handleSendOtp = () => {
     if (!orgId.trim() || !contact.trim()) return;

@@ -9,6 +9,9 @@ export interface BankOfficer {
   department: string;
   employeeId: string;
   email: string;
+  mobile?: string;
+  city?: string;
+  dateApplied?: string;
   status: "pending" | "approved" | "rejected";
 }
 
@@ -38,6 +41,10 @@ interface AdminContextType {
   addBankOfficer: (officer: BankOfficer) => void;
   approveBankOfficer: (id: string) => void;
   rejectBankOfficer: (id: string) => void;
+  /** Alias for approveBankOfficer — used by banker approval workflow */
+  approveBanker: (id: string) => void;
+  /** Alias for rejectBankOfficer — used by banker approval workflow */
+  rejectBanker: (id: string) => void;
   suspendUser: (id: string) => void;
   deleteUser: (id: string) => void;
   approveListing: (id: string) => void;
@@ -107,6 +114,8 @@ const AdminContext = createContext<AdminContextType>({
   addBankOfficer: () => {},
   approveBankOfficer: () => {},
   rejectBankOfficer: () => {},
+  approveBanker: () => {},
+  rejectBanker: () => {},
   suspendUser: () => {},
   deleteUser: () => {},
   approveListing: () => {},
@@ -159,7 +168,21 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         o.id === id ? { ...o, status: "approved" as const } : o,
       );
       saveToStorage("valubrix_bank_officers", next);
+      // Also update the user DB so banker login sees approved status
       try {
+        const officer = prev.find((o) => o.id === id);
+        if (officer) {
+          const userDb = JSON.parse(
+            localStorage.getItem("valubrix_user_db") || "{}",
+          );
+          if (userDb[officer.email]) {
+            userDb[officer.email] = {
+              ...userDb[officer.email],
+              bankOfficerStatus: "approved",
+            };
+            localStorage.setItem("valubrix_user_db", JSON.stringify(userDb));
+          }
+        }
         const session = localStorage.getItem("valubrix_bank_officer");
         if (session) {
           const parsed = JSON.parse(session);
@@ -168,6 +191,24 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
               "valubrix_bank_officer",
               JSON.stringify({ ...parsed, status: "approved" }),
             );
+          }
+        }
+        // Also update current logged-in user if they are this banker
+        const currentUser = JSON.parse(
+          localStorage.getItem("valubrix_user") || "null",
+        );
+        if (
+          currentUser &&
+          (currentUser.role === "banker" || currentUser.role === "bankOfficer")
+        ) {
+          const match = prev.find((o) => o.id === id);
+          if (
+            match &&
+            (currentUser.email === match.email ||
+              currentUser.mobile === match.mobile)
+          ) {
+            const updated = { ...currentUser, bankOfficerStatus: "approved" };
+            localStorage.setItem("valubrix_user", JSON.stringify(updated));
           }
         }
       } catch {
@@ -250,6 +291,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         addBankOfficer,
         approveBankOfficer,
         rejectBankOfficer,
+        approveBanker: approveBankOfficer,
+        rejectBanker: rejectBankOfficer,
         suspendUser,
         deleteUser,
         approveListing,

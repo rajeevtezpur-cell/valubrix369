@@ -12,7 +12,10 @@ import LocationSelectMap from "../components/LocationSelectMap";
 import type { LocationSelectResult } from "../components/LocationSelectMap";
 import SmartLocationSearch from "../components/SmartLocationSearch";
 import PropertyTypeStep from "../components/steps/PropertyTypeStep";
-import type { PropertyTypeData } from "../components/steps/types";
+import type {
+  ApartmentSubType,
+  PropertyTypeData,
+} from "../components/steps/types";
 import { ALL_LOCALITY_COORDS, getCoords } from "../data/localityCoords";
 import type { LocationRecord } from "../data/locationData";
 
@@ -81,10 +84,14 @@ export default function AreaDiscoverPage() {
     [city],
   );
 
-  function buildNavParams(propertyType?: string): Record<string, string> {
+  function buildNavParams(
+    propertyType?: string,
+    apartmentSubType?: ApartmentSubType,
+  ): Record<string, string> {
     const locality = selectedLocation?.name ?? "";
     const params: Record<string, string> = { locality, city };
     if (propertyType) params.propertyType = propertyType;
+    if (apartmentSubType) params.apartmentSubType = apartmentSubType;
     // Always pass lat/lng if we have a real location (selected or map pin)
     if (mapCenter[0] !== 12.9716 || mapCenter[1] !== 77.5946) {
       params.lat = String(mapCenter[0]);
@@ -128,8 +135,10 @@ export default function AreaDiscoverPage() {
     setStep(2);
   }
 
-  function handlePropertyTypeNext(data: PropertyTypeData) {
-    const params = buildNavParams(data.propertyType);
+  function handlePropertyTypeNext(
+    data: PropertyTypeData & { apartmentSubType?: ApartmentSubType },
+  ) {
+    const params = buildNavParams(data.propertyType, data.apartmentSubType);
     setPendingNavParams(params);
     setShowOverlay(true);
   }

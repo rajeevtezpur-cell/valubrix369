@@ -19,6 +19,7 @@ import {
   getTopTechParks,
 } from "./engines/infraEngine";
 import { getNearestMetros } from "./engines/metroEngine";
+import { applyApartmentSubTypeMultiplier } from "./engines/psfLearningEngine";
 // Import single-source-of-truth PSF and real tech/metro engines
 import { getBasePSF } from "./utils/localityEngine";
 
@@ -72,6 +73,8 @@ export interface ValuationInput {
   propertyType: string;
   bhk: number;
   projectName?: string;
+  /** GAP 1: Apartment sub-type — affects PSF multiplier (standalone: 0.88, gated: 1.0, township: 1.12) */
+  apartmentSubType?: "standalone" | "gated" | "township";
 }
 
 export interface ValuationOutput {
@@ -890,6 +893,7 @@ export interface ComparableSale {
 
 export function valuateProperty(input: ValuationInput): ValuationResult {
   const { locality, builder, city, area, floor, propertyType, bhk } = input;
+  const apartmentSubType = input.apartmentSubType;
 
   // Resolve location coords — priority: input lat/lng → MICRO_LOCATIONS lookup → localityCoords → Bangalore centre
   const microLoc = MICRO_LOCATIONS.find(
@@ -919,7 +923,18 @@ export function valuateProperty(input: ValuationInput): ValuationResult {
     return "apartment";
   }
   const typeKey = getTypeKey(propertyType);
-  const basePrice = getBasePSF(locality, typeKey);
+  const rawBasePrice = getBasePSF(locality, typeKey);
+  // GAP 1: Apply apartment sub-type multiplier (standalone: 0.88x, gated: 1.0x, township: 1.12x)
+  const basePrice =
+    typeKey === "apartment" && apartmentSubType
+      ? applyApartmentSubTypeMultiplier(rawBasePrice, apartmentSubType)
+      : rawBasePrice;
+
+  if (typeKey === "apartment" && apartmentSubType) {
+    console.log(
+      `[ValuBrix] Apartment sub-type="${apartmentSubType}": basePSF ${rawBasePrice} → ${basePrice}`,
+    );
+  }
 
   // ── METRO: use real haversine distances via metroEngine ──────────────────────
   const metros = getNearestMetros(lat, lng, 3);

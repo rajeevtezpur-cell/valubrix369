@@ -23,6 +23,14 @@ interface Props {
   schools?: InfraItem[];
   hospitals?: InfraItem[];
   malls?: InfraItem[];
+  /**
+   * Apartment sub-type adjustment to livability score.
+   * Standalone: 0, Gated: +4, Township: +8
+   * (from locationScoringEngine APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS)
+   */
+  subTypeLivabilityAdj?: number;
+  /** Label shown in score badge when sub-type is active */
+  subTypeLabel?: string;
 }
 
 function LiveabilitySkeleton() {
@@ -76,6 +84,8 @@ export function LiveabilityScoreCard({
   schools: schoolsProp,
   hospitals: hospitalsProp,
   malls: mallsProp,
+  subTypeLivabilityAdj = 0,
+  subTypeLabel,
 }: Props) {
   const [schools, setSchools] = useState<InfraItem[]>([]);
   const [hospitals, setHospitals] = useState<InfraItem[]>([]);
@@ -84,10 +94,13 @@ export function LiveabilityScoreCard({
   useEffect(() => {
     // Guard: don't fire fallback fetch while parent is still loading pre-fetched arrays
     if (isLoading) return;
+    // Guard: do not fetch with zero or missing coordinates
+    if (!lat || !lng || lat === 0 || lng === 0) return;
+    console.log(`[LiveabilityScore] lat=${lat}, lng=${lng}`);
     // If pre-fetched arrays are provided and non-empty, use them directly — no re-fetch
     if (schoolsProp && schoolsProp.length > 0) {
       setSchools(schoolsProp);
-    } else if (lat && lng) {
+    } else {
       getTopSchools(lat, lng, 5)
         .then(setSchools)
         .catch(() => setSchools([]));
@@ -96,9 +109,10 @@ export function LiveabilityScoreCard({
 
   useEffect(() => {
     if (isLoading) return;
+    if (!lat || !lng || lat === 0 || lng === 0) return;
     if (hospitalsProp && hospitalsProp.length > 0) {
       setHospitals(hospitalsProp);
-    } else if (lat && lng) {
+    } else {
       getTopHospitals(lat, lng, 5)
         .then(setHospitals)
         .catch(() => setHospitals([]));
@@ -107,9 +121,10 @@ export function LiveabilityScoreCard({
 
   useEffect(() => {
     if (isLoading) return;
+    if (!lat || !lng || lat === 0 || lng === 0) return;
     if (mallsProp && mallsProp.length > 0) {
       setMalls(mallsProp);
-    } else if (lat && lng) {
+    } else {
       getTopMalls(lat, lng, 5)
         .then(setMalls)
         .catch(() => setMalls([]));
@@ -121,14 +136,16 @@ export function LiveabilityScoreCard({
   const retailStars = getStarCount(malls.length);
 
   // Weighted score: schools 30%, hospitals 40%, retail 30%
+  // Sub-type adjustment: Township +8, Gated +4, Standalone +0 (from APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS)
   const score = useMemo(() => {
     const schoolScore = (schoolStars / 4) * 100;
     const hospitalScore = (hospitalStars / 4) * 100;
     const retailScore = (retailStars / 4) * 100;
-    return Math.round(
+    const base = Math.round(
       schoolScore * 0.3 + hospitalScore * 0.4 + retailScore * 0.3,
     );
-  }, [schoolStars, hospitalStars, retailStars]);
+    return Math.min(100, Math.max(0, base + subTypeLivabilityAdj));
+  }, [schoolStars, hospitalStars, retailStars, subTypeLivabilityAdj]);
 
   const scoreColor =
     score >= 70 ? "#10b981" : score >= 45 ? "#f59e0b" : "#ef4444";
@@ -145,6 +162,15 @@ export function LiveabilityScoreCard({
     return (
       <div className="rounded-2xl p-6 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50">
         <LiveabilitySkeleton />
+      </div>
+    );
+  }
+
+  // Guard: if no real coordinates, show "select location" state
+  if (!lat || !lng || lat === 0 || lng === 0) {
+    return (
+      <div className="rounded-2xl p-6 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 text-white/40 text-sm text-center">
+        Select a location to view livability data
       </div>
     );
   }
@@ -176,6 +202,18 @@ export function LiveabilityScoreCard({
           style={{ fontFamily: "'Playfair Display', serif", color: GOLD }}
         >
           Livability Score
+          {subTypeLabel && (
+            <span
+              className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full align-middle"
+              style={{
+                background: "rgba(96,165,250,0.12)",
+                color: "#60a5fa",
+                border: "1px solid rgba(96,165,250,0.25)",
+              }}
+            >
+              {subTypeLabel}
+            </span>
+          )}
         </h2>
       </div>
 
@@ -301,7 +339,9 @@ export function LiveabilityScoreCard({
             Nearest school:{" "}
             <span className="text-white/55">{schools[0]?.name}</span>
             {" · "}
-            {(schools[0]?.osrmKm ?? 0).toFixed(1)} km
+            {schools[0]?.osrmKm && schools[0].osrmKm > 0
+              ? `${schools[0].osrmKm.toFixed(1)} km`
+              : "Distance unavailable"}
           </p>
         </div>
       )}

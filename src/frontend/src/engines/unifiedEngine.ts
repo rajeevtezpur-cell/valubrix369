@@ -17,6 +17,7 @@ import { getDealScore } from "./dealEngine";
 import { type DemandOutput, getDemandOutput } from "./demandEngine";
 import { computeEnsemblePrice, savePriceSnapshot } from "./ensembleEngine";
 import { getPricePrediction } from "./predictionEngine";
+import type { ApartmentSubType } from "./psfLearningEngine";
 import { getLocalityCoords } from "./valuationEngine";
 
 // ─── Guidance value floor tables (mirrors ensembleEngine safeguard) ──────────────────
@@ -86,6 +87,7 @@ export interface ValuationInput {
   floor?: string;
   builder?: string;
   project?: string;
+  apartmentSubType?: ApartmentSubType; // standalone | gated | township (required when propertyType === 'apartment')
   lat?: number;
   lng?: number;
 }
@@ -287,6 +289,7 @@ export async function valuateProperty(
     sqft: area,
     builder: builder || undefined,
     project: project || undefined,
+    apartmentSubType: input.apartmentSubType,
     floorNumber: floorNum,
     propertyAge: ageNum,
   });

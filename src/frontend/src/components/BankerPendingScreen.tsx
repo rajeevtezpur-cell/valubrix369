@@ -1,4 +1,4 @@
-import { Clock, LogOut, Shield } from "lucide-react";
+import { Clock, LogOut, MessageCircle, Shield } from "lucide-react";
 import { motion } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 
@@ -64,7 +64,30 @@ export default function BankerPendingScreen() {
           }}
         />
 
-        {/* Icon */}
+        {/* ValuBrix logo */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          style={{ marginBottom: 24 }}
+        >
+          <img
+            src="/assets/uploads/5EB5878E-7937-4598-9486-6156F9B2EB9F-3-1.png"
+            alt="ValuBrix"
+            style={{
+              height: 36,
+              width: "auto",
+              margin: "0 auto",
+              display: "block",
+              objectFit: "contain",
+            }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </motion.div>
+
+        {/* Shield icon */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -111,7 +134,7 @@ export default function BankerPendingScreen() {
             marginBottom: 8,
           }}
         >
-          Your account is under verification. Access will be granted shortly.
+          Your banker access request is under review by our admin team.
         </motion.p>
 
         <motion.p
@@ -125,8 +148,8 @@ export default function BankerPendingScreen() {
             marginBottom: 28,
           }}
         >
-          Our team reviews banker accounts to ensure platform integrity. You'll
-          receive access within 24–48 hours.
+          Your application is being reviewed. You'll receive access once
+          approved by an admin. This typically takes 24–48 hours.
         </motion.p>
 
         {/* Status badge */}
@@ -134,6 +157,7 @@ export default function BankerPendingScreen() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.5 }}
+          data-ocid="banker_pending.status_badge"
           style={{
             background: "rgba(251,191,36,0.08)",
             border: "1px solid rgba(251,191,36,0.25)",
@@ -163,34 +187,74 @@ export default function BankerPendingScreen() {
           )}
         </motion.div>
 
-        <motion.button
-          type="button"
-          data-ocid="banker_pending.logout.button"
+        {/* Action buttons */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.55 }}
-          onClick={logout}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            background: "transparent",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 10,
-            padding: "10px 20px",
-            color: "rgba(255,255,255,0.4)",
-            fontSize: 13,
-            cursor: "pointer",
-            margin: "0 auto",
-            transition: "all 0.2s",
-          }}
-          whileHover={{
-            color: "rgba(255,255,255,0.7)",
-            borderColor: "rgba(255,255,255,0.25)",
-          }}
+          style={{ display: "flex", flexDirection: "column", gap: 10 }}
         >
-          <LogOut size={14} /> Logout
-        </motion.button>
+          {/* Contact Support link */}
+          <a
+            href="https://wa.me/917259416508"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-ocid="banker_pending.contact_support.link"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              background: "rgba(201,168,76,0.1)",
+              border: "1px solid rgba(201,168,76,0.3)",
+              borderRadius: 10,
+              padding: "11px 20px",
+              color: "#D4AF37",
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: "none",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.background =
+                "rgba(201,168,76,0.18)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLAnchorElement).style.background =
+                "rgba(201,168,76,0.1)";
+            }}
+          >
+            <MessageCircle size={14} /> Contact Support
+          </a>
+
+          {/* Logout button */}
+          <motion.button
+            type="button"
+            data-ocid="banker_pending.logout.button"
+            onClick={logout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              background: "transparent",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 10,
+              padding: "10px 20px",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 13,
+              cursor: "pointer",
+              transition: "all 0.2s",
+              width: "100%",
+            }}
+            whileHover={{
+              color: "rgba(255,255,255,0.7)",
+              borderColor: "rgba(255,255,255,0.25)",
+            }}
+          >
+            <LogOut size={14} /> Logout
+          </motion.button>
+        </motion.div>
       </motion.div>
     </div>
   );

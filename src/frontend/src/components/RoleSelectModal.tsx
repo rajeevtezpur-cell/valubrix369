@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
+import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const roles = [
@@ -8,7 +9,12 @@ const roles = [
     emoji: "🏡",
     title: "Buyer",
     desc: "Discover properties & get AI valuations",
-    color: "#3B82F6",
+    gradient: "linear-gradient(135deg, #D4AF37, #F6D77A)",
+    glow: "0 0 18px rgba(212,175,55,0.45)",
+    pillBorder: "rgba(212,175,55,0.55)",
+    hoverBg: "rgba(212,175,55,0.08)",
+    hoverBorder: "rgba(212,175,55,0.4)",
+    textColor: "#1a1a1a",
     note: null,
   },
   {
@@ -16,7 +22,12 @@ const roles = [
     emoji: "🏢",
     title: "Seller",
     desc: "List properties & reach serious buyers",
-    color: "#C9A84C",
+    gradient: "linear-gradient(135deg, #10B981, #34D399)",
+    glow: "0 0 18px rgba(16,185,129,0.4)",
+    pillBorder: "rgba(16,185,129,0.55)",
+    hoverBg: "rgba(16,185,129,0.08)",
+    hoverBorder: "rgba(16,185,129,0.4)",
+    textColor: "#1a1a1a",
     note: null,
   },
   {
@@ -24,7 +35,12 @@ const roles = [
     emoji: "🏦",
     title: "Banker",
     desc: "Access institutional valuation reports",
-    color: "#16C784",
+    gradient: "linear-gradient(135deg, #3B82F6, #60A5FA)",
+    glow: "0 0 18px rgba(59,130,246,0.4)",
+    pillBorder: "rgba(59,130,246,0.55)",
+    hoverBg: "rgba(59,130,246,0.08)",
+    hoverBorder: "rgba(59,130,246,0.4)",
+    textColor: "#ffffff",
     note: "Requires admin approval",
   },
 ];
@@ -41,14 +57,25 @@ export default function RoleSelectModal() {
   } = useAuth();
   const navigate = useNavigate();
 
+  // Admin users must NEVER see the role selection modal.
+  // If showRoleSelect triggers while user is admin/tester, close it and go to admin dashboard.
+  useEffect(() => {
+    if (
+      showRoleSelect &&
+      user &&
+      (user.role === "admin" || user.role === "tester")
+    ) {
+      closeRoleSelect();
+      navigate({ to: "/admin/dashboard" });
+    }
+  }, [showRoleSelect, user, closeRoleSelect, navigate]);
+
   const handleSelect = (roleId: "buyer" | "seller" | "banker") => {
     if (!user) {
-      // Pre-login: set role then open login modal
       setSelectedRole(roleId);
       closeRoleSelect();
       openLoginModal(roleId);
     } else {
-      // Post-login: set role and navigate
       setUserRole(roleId);
       closeRoleSelect();
       const dest = intendedPortal ?? roleId;
@@ -73,7 +100,7 @@ export default function RoleSelectModal() {
           position: "fixed",
           inset: 0,
           zIndex: 1001,
-          background: "rgba(10,15,30,0.9)",
+          background: "rgba(10,15,30,0.92)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           display: "flex",
@@ -99,6 +126,7 @@ export default function RoleSelectModal() {
             position: "relative",
           }}
         >
+          {/* Top accent bar */}
           <div
             style={{
               position: "absolute",
@@ -107,7 +135,7 @@ export default function RoleSelectModal() {
               right: 0,
               height: 3,
               background:
-                "linear-gradient(90deg, transparent, #C9A84C, #D4AF37, transparent)",
+                "linear-gradient(90deg, transparent, #D4AF37, #F6D77A, transparent)",
             }}
           />
 
@@ -153,18 +181,21 @@ export default function RoleSelectModal() {
                     width: "100%",
                   }}
                   whileHover={{
-                    background: `rgba(${hexToRgb(role.color)},0.08)` as any,
-                    borderColor: `rgba(${hexToRgb(role.color)},0.4)`,
+                    background: role.hoverBg as any,
+                    borderColor: role.hoverBorder,
                     y: -2,
+                    boxShadow: role.glow,
                   }}
                 >
+                  {/* Glass pill icon */}
                   <div
                     style={{
                       width: 48,
                       height: 48,
                       borderRadius: 14,
-                      background: `rgba(${hexToRgb(role.color)},0.12)`,
-                      border: `1px solid rgba(${hexToRgb(role.color)},0.25)`,
+                      background: role.gradient,
+                      boxShadow: role.glow,
+                      border: `1px solid ${role.pillBorder}`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -174,20 +205,29 @@ export default function RoleSelectModal() {
                   >
                     {role.emoji}
                   </div>
+
+                  {/* Text content */}
                   <div style={{ flex: 1 }}>
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
-                        marginBottom: 2,
+                        marginBottom: 4,
                       }}
                     >
+                      {/* Role name pill */}
                       <span
                         style={{
-                          color: "white",
+                          background: role.gradient,
+                          color: role.textColor,
+                          fontSize: 12,
                           fontWeight: 700,
-                          fontSize: 15,
+                          padding: "3px 12px",
+                          borderRadius: 9999,
+                          border: `1px solid ${role.pillBorder}`,
+                          boxShadow: `0 0 8px ${role.hoverBorder}`,
+                          letterSpacing: "0.04em",
                         }}
                       >
                         {role.title}
@@ -196,9 +236,9 @@ export default function RoleSelectModal() {
                         <span
                           style={{
                             fontSize: 10,
-                            color: role.color,
-                            background: `rgba(${hexToRgb(role.color)},0.12)`,
-                            border: `1px solid rgba(${hexToRgb(role.color)},0.25)`,
+                            color: "rgba(255,255,255,0.5)",
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid rgba(255,255,255,0.12)",
                             borderRadius: 20,
                             padding: "2px 8px",
                             fontWeight: 600,
@@ -214,6 +254,8 @@ export default function RoleSelectModal() {
                       {role.desc}
                     </p>
                   </div>
+
+                  {/* Arrow */}
                   <svg
                     width="16"
                     height="16"
@@ -223,7 +265,7 @@ export default function RoleSelectModal() {
                   >
                     <path
                       d="M6 12l4-4-4-4"
-                      stroke={role.color}
+                      stroke="rgba(255,255,255,0.35)"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -237,11 +279,4 @@ export default function RoleSelectModal() {
       </motion.div>
     </AnimatePresence>
   );
-}
-
-function hexToRgb(hex: string): string {
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
-  return `${r},${g},${b}`;
 }

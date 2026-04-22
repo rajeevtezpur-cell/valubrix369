@@ -22,6 +22,11 @@
 
 import { ALL_LOCALITY_COORDS } from "../data/localityCoords";
 import {
+  markTrainingComplete,
+  markTrainingStarted,
+  waitForWeightsReady,
+} from "../services/modelWeightsStore";
+import {
   getBasePSF,
   getLocalityZone,
   getZoneMedianPSF,
@@ -38,6 +43,7 @@ import {
   getProjectAveragePricePerSqft,
   getVarianceStatus,
   predictPricePerSqft,
+  trainAndCache,
 } from "./linearRegressionEngine";
 import { METROS, haversineDistance } from "./metroEngine";
 import {
@@ -58,9 +64,73 @@ import {
   isNorthBangalore,
 } from "./northBangaloreEngine";
 import {
+  type ApartmentSubType,
+  applyApartmentSubTypeMultiplier,
+  getZoneBuilderMedian,
+} from "./psfLearningEngine";
+import {
   computeSouthBangaloreAdjustments,
   isSouthBangalore,
 } from "./southBangaloreEngine";
+
+// ─── Startup model initialization (non-blocking) ──────────────────────────────
+//
+// Trains all per-type × per-region model combinations at module load time using
+// requestIdleCallback (with setTimeout fallback). Weights are saved to
+// modelWeightsStore for persistence. Subsequent inference calls skip training.
+
+const STARTUP_COMBINATIONS: Array<{
+  type: "apartment" | "villa" | "plot" | "commercial";
+  region: "north" | "south" | "east" | "global";
+}> = [
+  { type: "apartment", region: "north" },
+  { type: "apartment", region: "south" },
+  { type: "apartment", region: "east" },
+  { type: "apartment", region: "global" },
+  { type: "villa", region: "north" },
+  { type: "villa", region: "south" },
+  { type: "villa", region: "east" },
+  { type: "villa", region: "global" },
+  { type: "plot", region: "global" },
+  { type: "commercial", region: "global" },
+];
+
+function initializeModels(): void {
+  if (typeof window === "undefined") return; // SSR guard
+  markTrainingStarted();
+  // Process each combination sequentially with yielding via setTimeout to avoid
+  // blocking the main thread. Each step takes <50ms.
+  let idx = 0;
+  function processNext() {
+    if (idx >= STARTUP_COMBINATIONS.length) {
+      markTrainingComplete();
+      return;
+    }
+    const combo = STARTUP_COMBINATIONS[idx++];
+    try {
+      trainAndCache(combo.type, combo.region);
+    } catch {
+      // Training errors must never crash inference — fail silently
+    }
+    // Yield between each combination
+    setTimeout(processNext, 0);
+  }
+  processNext();
+}
+
+// Kick off at module load time — non-blocking via requestIdleCallback → setTimeout fallback
+if (typeof window !== "undefined") {
+  if ("requestIdleCallback" in window) {
+    (window as Window & typeof globalThis).requestIdleCallback(() => {
+      initializeModels();
+    });
+  } else {
+    setTimeout(initializeModels, 0);
+  }
+}
+
+// Export so external callers can await model readiness before first inference
+export { waitForWeightsReady as waitForModelsReady };
 
 // ─── SAFEGUARD: Multiplier Caps ──────────────────────────────────────────────────────────
 // All seven multiplier dimensions are clamped to safe bounds before being applied.
@@ -366,6 +436,7 @@ export interface EnsembleInput {
   sqft: number;
   builder?: string;
   project?: string;
+  apartmentSubType?: ApartmentSubType; // standalone | gated | township
   // For similarity scoring (Refinement 3)
   floorNumber?: number;
   totalFloors?: number;
@@ -2694,6 +2765,69 @@ export function computeEnsemblePrice(input: EnsembleInput): EnsembleOutput {
 
   const finalPriceAfterEast = Math.round(finalPriceWithSize * ebCombinedFactor);
 
+  // ── BUILDER + APARTMENT SUB-TYPE MULTIPLIER (applied to final price) ──────────────
+  // These multipliers were computed earlier in the pipeline but only used in the adj-
+  // layer blend (8% weight). Here we apply them multiplicatively to the post-region
+  // price so that selecting Prestige vs Independent, or Township vs Standalone, changes
+  // the final PSF meaningfully.
+  //
+  // Builder multiplier:
+  //   - If builder found in data: builderPremiumFactor (already computed, capped 0.90–1.25)
+  //   - If no builder or factor == 1.0: use locality zone-builder median from psfLearningEngine
+  //     so unbranded properties don't get a false 1.0 bonus relative to branded ones
+  //
+  // Sub-type multiplier (apartments only):
+  //   - standalone: 0.88, gated: 1.00, township: 1.12
+  //   - Delegated to applyApartmentSubTypeMultiplier() from psfLearningEngine
+  //   - Only applied when propertyType is apartment and subType is provided
+
+  const isApartment = _typeKey === "apartment";
+
+  // Resolve effective builder multiplier
+  let effectiveBuilderMultiplier: number;
+  if (input.builder?.trim() && builderPremiumFactor !== 1.0) {
+    // Data-learned builder premium already capped at [0.90, 1.25]
+    effectiveBuilderMultiplier = builderPremiumFactor;
+  } else if (input.builder?.trim()) {
+    // Builder selected but no data found — use zone median instead of neutral 1.0
+    const zoneMedian = getZoneBuilderMedian(input.locality);
+    effectiveBuilderMultiplier = capBuilderMultiplier(zoneMedian);
+  } else {
+    effectiveBuilderMultiplier = 1.0;
+  }
+
+  // Resolve effective sub-type multiplier
+  let effectiveSubTypeMultiplier = 1.0;
+  if (isApartment && input.apartmentSubType) {
+    const subTypePSF = applyApartmentSubTypeMultiplier(
+      10000,
+      input.apartmentSubType,
+    );
+    effectiveSubTypeMultiplier = subTypePSF / 10000; // extract ratio from dummy PSF
+  }
+
+  // Combine both multipliers and clamp to [0.85, 1.40]
+  const combinedMultiplier = clamp(
+    effectiveBuilderMultiplier * effectiveSubTypeMultiplier,
+    0.85,
+    1.4,
+  );
+
+  const finalPriceAfterMultipliers = Math.round(
+    finalPriceAfterEast * combinedMultiplier,
+  );
+
+  // Debug logs
+  console.log(
+    `[ValuBrix] Builder: "${input.builder ?? "none"}" | multiplier: ${effectiveBuilderMultiplier.toFixed(3)}`,
+  );
+  console.log(
+    `[ValuBrix] Sub-type: "${input.apartmentSubType ?? "none"}" | multiplier: ${effectiveSubTypeMultiplier.toFixed(3)}`,
+  );
+  console.log(
+    `[ValuBrix] Combined multiplier: ${combinedMultiplier.toFixed(3)} | Before: ₹${finalPriceAfterEast} | After: ₹${finalPriceAfterMultipliers}`,
+  );
+
   // Compute adaptive velocity metrics for debug output
   const velocityMetrics = computeTransactionVelocity(
     input.locality,
@@ -2852,11 +2986,15 @@ export function computeEnsemblePrice(input: EnsembleInput): EnsembleOutput {
   // Applied to finalPrice (median), lowerBound, and upperBound identically.
   const guidancePSF = getGuidancePSF(input.locality, input.propertyType);
   const guardedFinalPrice = applyGuidanceFloor(
-    finalPriceAfterEast,
+    finalPriceAfterMultipliers,
     guidancePSF,
   );
-  const rawLowerBound = Math.round(finalPriceAfterEast * (1 - spreadFactor));
-  const rawUpperBound = Math.round(finalPriceAfterEast * (1 + spreadFactor));
+  const rawLowerBound = Math.round(
+    finalPriceAfterMultipliers * (1 - spreadFactor),
+  );
+  const rawUpperBound = Math.round(
+    finalPriceAfterMultipliers * (1 + spreadFactor),
+  );
   const guardedLowerBound = applyGuidanceFloor(rawLowerBound, guidancePSF);
   const guardedUpperBound = applyGuidanceFloor(rawUpperBound, guidancePSF);
 

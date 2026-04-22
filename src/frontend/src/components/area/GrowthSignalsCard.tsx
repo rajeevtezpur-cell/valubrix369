@@ -17,6 +17,14 @@ interface Props {
   priceTrend3Y?: number;
   classification?: string;
   loading?: boolean;
+  /**
+   * Apartment sub-type adjustment to growth score.
+   * Standalone: 0, Gated: +3, Township: +6
+   * (from locationScoringEngine APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS)
+   */
+  subTypeGrowthAdj?: number;
+  /** Label shown beside the card title when sub-type is active */
+  subTypeLabel?: string;
 }
 
 function GrowthSkeleton() {
@@ -142,11 +150,17 @@ export function GrowthSignalsCard({
   priceTrend3Y,
   classification,
   loading,
+  subTypeGrowthAdj = 0,
+  subTypeLabel,
 }: Props) {
   const forecast = useMemo(() => computePriceForecast(locality), [locality]);
 
-  const trend1Y = priceTrend1Y ?? forecast.growthRates.oneYear;
-  const trend3Y = priceTrend3Y ?? forecast.growthRates.threeYear;
+  // Apply sub-type growth adjustment to trend values
+  // Township +6, Gated +3, Standalone +0 (APARTMENT_SUBTYPE_SCORE_ADJUSTMENTS)
+  const trend1Y =
+    (priceTrend1Y ?? forecast.growthRates.oneYear) + subTypeGrowthAdj * 0.1;
+  const trend3Y =
+    (priceTrend3Y ?? forecast.growthRates.threeYear) + subTypeGrowthAdj * 0.15;
   const trend6M = useMemo(() => {
     if (
       forecast.exponentialForecasts?.["6month"]?.baseGrowthPct !== undefined
@@ -210,6 +224,18 @@ export function GrowthSignalsCard({
           style={{ fontFamily: "'Playfair Display', serif", color: GOLD }}
         >
           Growth Signals
+          {subTypeLabel && (
+            <span
+              className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full align-middle"
+              style={{
+                background: "rgba(16,185,129,0.12)",
+                color: "#10b981",
+                border: "1px solid rgba(16,185,129,0.25)",
+              }}
+            >
+              {subTypeLabel}
+            </span>
+          )}
         </h2>
       </div>
 

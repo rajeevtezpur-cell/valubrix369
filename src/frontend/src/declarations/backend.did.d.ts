@@ -28,6 +28,26 @@ export interface AILearningSubmission {
   'notes' : string,
   'locality' : string,
 }
+export type ApartmentSubType = { 'township' : null } |
+  { 'gated' : null } |
+  { 'standalone' : null } |
+  { 'unknown' : null };
+export interface BankerApplication {
+  'id' : bigint,
+  'org' : string,
+  'status' : BankerStatus,
+  'appliedAt' : bigint,
+  'principal' : Principal,
+  'city' : string,
+  'name' : string,
+  'reviewNote' : string,
+  'reviewedAt' : [] | [bigint],
+  'email' : string,
+  'mobile' : string,
+}
+export type BankerStatus = { 'pending' : null } |
+  { 'approved' : null } |
+  { 'rejected' : null };
 export interface DealScoreResponse {
   'fairValue' : bigint,
   'expectedDaysToSell' : bigint,
@@ -235,6 +255,15 @@ export interface ValuationReport {
   'confidence' : bigint,
   'location' : string,
 }
+export interface ValuationRequest {
+  'age' : bigint,
+  'propertyType' : string,
+  'sqft' : bigint,
+  'builderName' : [] | [string],
+  'apartmentSubType' : [] | [ApartmentSubType],
+  'locality' : string,
+  'amenitiesCount' : bigint,
+}
 export interface ValuationResponse {
   'breakdown' : ValuationBreakdown,
   'confidenceReason' : string,
@@ -243,6 +272,25 @@ export interface ValuationResponse {
   'priceMin' : bigint,
   'confidence' : bigint,
   'localityFound' : boolean,
+}
+export interface ValuationResult {
+  'comparablesUsed' : bigint,
+  'subTypeMultiplier' : bigint,
+  'pricePerSqft' : bigint,
+  'infraContribution' : bigint,
+  'metroContribution' : bigint,
+  'locationContribution' : bigint,
+  'confidenceReason' : string,
+  'subTypeApplied' : string,
+  'builderApplied' : string,
+  'demandContribution' : bigint,
+  'bestPrice' : bigint,
+  'comparablesContribution' : bigint,
+  'priceMax' : bigint,
+  'priceMin' : bigint,
+  'confidence' : bigint,
+  'localityFound' : boolean,
+  'builderMultiplier' : bigint,
 }
 export interface _ImmutableObjectStorageCreateCertificateResult {
   'method' : string,
@@ -287,6 +335,7 @@ export interface _SERVICE {
     [string, PropertyType, bigint, bigint, bigint],
     bigint
   >,
+  'approveBankOfficer' : ActorMethod<[bigint, string], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'cleanupOldData' : ActorMethod<[bigint], string>,
   'computeValuation' : ActorMethod<
@@ -331,6 +380,7 @@ export interface _SERVICE {
     Array<PropertyListing>
   >,
   'getAILearningSubmissions' : ActorMethod<[], Array<AILearningSubmission>>,
+  'getAllBankerApps' : ActorMethod<[], Array<BankerApplication>>,
   'getAllPublishedListings' : ActorMethod<[], Array<PropertyListing>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
@@ -349,6 +399,8 @@ export interface _SERVICE {
   'getLocalityList' : ActorMethod<[], Array<string>>,
   'getManualProjects' : ActorMethod<[string], Array<ManualProjectEntry>>,
   'getMetroInfo' : ActorMethod<[string], MetroInfo>,
+  'getMyBankerStatus' : ActorMethod<[], string>,
+  'getPendingBankers' : ActorMethod<[], Array<BankerApplication>>,
   'getPriceHistory' : ActorMethod<[string], Array<PriceSnapshot>>,
   'getRentalIntelligence' : ActorMethod<[string], RentalResponse>,
   'getReraProjects' : ActorMethod<[], Array<ReraProject>>,
@@ -370,11 +422,16 @@ export interface _SERVICE {
   'markLeadContacted' : ActorMethod<[string], boolean>,
   'publishListing' : ActorMethod<[bigint], undefined>,
   'recordDailySnapshot' : ActorMethod<[string], string>,
+  'registerBankOfficer' : ActorMethod<
+    [string, string, string, string, string],
+    bigint
+  >,
   'registerUser' : ActorMethod<
     [string, string, string, string, string, string],
     undefined
   >,
   'registerWithEmail' : ActorMethod<[string, string, string], string>,
+  'rejectBankOfficer' : ActorMethod<[bigint, string], boolean>,
   'runValidationTests' : ActorMethod<[], Array<string>>,
   'saveAILearningSubmission' : ActorMethod<[AILearningInput], string>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
@@ -392,6 +449,13 @@ export interface _SERVICE {
   'submitManualProject' : ActorMethod<[string, string], undefined>,
   'submitSaleFeedback' : ActorMethod<[string, bigint, bigint], string>,
   'submitSaleRecord' : ActorMethod<[string, bigint, string, bigint], string>,
+  /**
+   * / Extended valuation endpoint — accepts ValuationRequest, returns ValuationResult.
+   * / Uses the same core engine as computeValuation but layers in:
+   * /   1. Builder premium multiplier (clamped 0.90–1.40)
+   * /   2. Apartment sub-type multiplier (standalone < gated < township)
+   */
+  'submitValuation' : ActorMethod<[ValuationRequest], ValuationResult>,
   'trackFeedback' : ActorMethod<[bigint, string], undefined>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
   'unsaveProperty' : ActorMethod<[bigint], undefined>,

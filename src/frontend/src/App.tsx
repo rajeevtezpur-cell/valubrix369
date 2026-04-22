@@ -7,11 +7,15 @@ import {
   createRouter,
   redirect,
 } from "@tanstack/react-router";
+import BankerPendingScreen from "./components/BankerPendingScreen";
+import FloatingWhatsAppButton from "./components/FloatingWhatsAppButton";
+import GlobalRoleSwitcherDrawer from "./components/GlobalRoleSwitcherDrawer";
 import LoginModal from "./components/LoginModal";
 import RoleSelectModal from "./components/RoleSelectModal";
 import { AdminProvider } from "./context/AdminContext";
 import { AuthProvider } from "./context/AuthContext";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminLeadsPage from "./pages/AdminLeadsPage";
 import AdminListingsPage from "./pages/AdminListingsPage";
 import AdminPage from "./pages/AdminPage";
@@ -83,8 +87,11 @@ function RootLayout() {
     <>
       <LoginModal />
       <RoleSelectModal />
+      {/* GlobalRoleSwitcherDrawer mounts globally — appears on ALL pages */}
+      <GlobalRoleSwitcherDrawer />
       <Outlet />
       <Toaster />
+      <FloatingWhatsAppButton />
     </>
   );
 }
@@ -392,6 +399,13 @@ const buyerNeighbourhoodRoute = createRoute({
   component: BuyerNeighbourhoodPage,
 });
 
+// Banker pending approval screen — accessed after banker signup
+const bankerPendingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/banker-pending",
+  component: BankerPendingScreen,
+});
+
 // Bank / Banker Portal
 const bankRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -430,6 +444,11 @@ const adminRoute = createRoute({
   path: "/admin",
   component: AdminPage,
 });
+const adminDashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/dashboard",
+  component: AdminDashboardPage,
+});
 const adminUsersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin/users",
@@ -467,6 +486,36 @@ const adminLeadsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin/leads",
   component: AdminLeadsPage,
+});
+
+// Admin stubs for training, map-data, settings (redirect to admin dashboard for now)
+const adminTrainingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/training",
+  beforeLoad: () => {
+    throw redirect({ to: "/admin/dashboard" });
+  },
+});
+const adminMapDataRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/map-data",
+  beforeLoad: () => {
+    throw redirect({ to: "/admin/dashboard" });
+  },
+});
+const adminSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/settings",
+  beforeLoad: () => {
+    throw redirect({ to: "/admin/dashboard" });
+  },
+});
+const adminDataRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/data",
+  beforeLoad: () => {
+    throw redirect({ to: "/admin/data-distribution" });
+  },
 });
 
 const routeTree = rootRoute.addChildren([
@@ -532,7 +581,9 @@ const routeTree = rootRoute.addChildren([
   bankValuationRoute,
   bankBulkRoute,
   bankHistoryRoute,
+  bankerPendingRoute,
   adminRoute,
+  adminDashboardRoute,
   adminUsersRoute,
   adminApprovalsRoute,
   adminListingsRoute,
@@ -540,6 +591,10 @@ const routeTree = rootRoute.addChildren([
   adminDataDistRoute,
   adminReraRoute,
   adminLeadsRoute,
+  adminTrainingRoute,
+  adminMapDataRoute,
+  adminSettingsRoute,
+  adminDataRoute,
 ]);
 
 const router = createRouter({ routeTree });

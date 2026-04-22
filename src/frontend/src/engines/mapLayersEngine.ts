@@ -718,8 +718,8 @@ const RAILWAY_STATIONS: Omit<SmartPin, "id" | "priority">[] = [
   {
     type: "railway",
     name: "KSR Bengaluru City Station",
-    lat: 12.977,
-    lng: 77.572,
+    lat: 12.9767,
+    lng: 77.5713,
     emoji: "🚆",
     impactTag: "Connectivity boost",
     impactDescription: "Main railway terminus — intercity hub",
@@ -727,9 +727,9 @@ const RAILWAY_STATIONS: Omit<SmartPin, "id" | "priority">[] = [
   {
     type: "railway",
     name: "Yeshwanthpur Junction",
-    // Corrected: Yeshwanthpur Railway Junction (was 12.9787 = Rajajinagar area — WRONG)
-    lat: 13.0241,
-    lng: 77.5477,
+    // Verified: Yeshwanthpur Railway Junction — Google Maps + Indian Railways April 2026
+    lat: 13.0249,
+    lng: 77.5546,
     emoji: "🚆",
     impactTag: "Connectivity boost",
     impactDescription: "Second major railway hub in Bangalore",
@@ -737,8 +737,8 @@ const RAILWAY_STATIONS: Omit<SmartPin, "id" | "priority">[] = [
   {
     type: "railway",
     name: "Banaswadi Railway Station",
-    lat: 13.0106,
-    lng: 77.6562,
+    lat: 13.0214,
+    lng: 77.6499,
     emoji: "🚆",
     impactTag: "Connectivity boost",
     impactDescription: "North-east commuter rail access",
@@ -755,8 +755,8 @@ const RAILWAY_STATIONS: Omit<SmartPin, "id" | "priority">[] = [
   {
     type: "railway",
     name: "Krishnarajapuram (KJM) Station",
-    lat: 13.003,
-    lng: 77.674,
+    lat: 13.0079,
+    lng: 77.6884,
     emoji: "🚆",
     impactTag: "Connectivity boost",
     impactDescription: "East Bangalore commuter gateway",
@@ -764,8 +764,8 @@ const RAILWAY_STATIONS: Omit<SmartPin, "id" | "priority">[] = [
   {
     type: "railway",
     name: "Baiyappanahalli Station",
-    lat: 12.994,
-    lng: 77.648,
+    lat: 12.9887,
+    lng: 77.6481,
     emoji: "🚆",
     impactTag: "Connectivity boost",
     impactDescription: "East corridor metro + rail integration",
@@ -773,8 +773,8 @@ const RAILWAY_STATIONS: Omit<SmartPin, "id" | "priority">[] = [
   {
     type: "railway",
     name: "Bangalore Cantonment Station",
-    lat: 12.99,
-    lng: 77.601,
+    lat: 12.9985,
+    lng: 77.599,
     emoji: "🚆",
     impactTag: "Connectivity boost",
     impactDescription: "Central Bangalore rail point",
@@ -1143,7 +1143,14 @@ export type InfraLayerType =
   | "tech_park"
   | "mall"
   | "airport"
-  | "highway";
+  | "highway"
+  | "police"
+  | "petrol_pump"
+  | "pharmacy"
+  | "supermarket"
+  | "restaurant"
+  | "bank"
+  | "atm";
 
 export type LevelType = "smart" | "premium" | "growth" | "investment";
 
@@ -1415,6 +1422,741 @@ const HIGHWAYS: Omit<InfraPin, "id">[] = [
   },
 ];
 
+// ─── Police Stations ─────────────────────────────────────────────────────────
+
+const POLICE_STATIONS: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.042,
+    lng: 77.567,
+    name: "Jalahalli Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Local police station — BEL Road area coverage",
+  },
+  {
+    lat: 13.035,
+    lng: 77.597,
+    name: "Hebbal Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Hebbal jurisdiction covering ORR north",
+  },
+  {
+    lat: 12.978,
+    lng: 77.608,
+    name: "Ulsoor Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Central Bangalore jurisdiction",
+  },
+  {
+    lat: 12.933,
+    lng: 77.624,
+    name: "Koramangala Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Koramangala & BTM jurisdiction",
+  },
+  {
+    lat: 13.02,
+    lng: 77.694,
+    name: "Whitefield Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Whitefield tech corridor coverage",
+  },
+  {
+    lat: 12.91,
+    lng: 77.544,
+    name: "JP Nagar Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "JP Nagar & Banashankari coverage",
+  },
+  {
+    lat: 12.988,
+    lng: 77.56,
+    name: "Vijayanagar Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Vijayanagar & Rajajinagar coverage",
+  },
+  {
+    lat: 13.069,
+    lng: 77.648,
+    name: "Thanisandra Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Thanisandra & Manyata corridor",
+  },
+  {
+    lat: 12.96,
+    lng: 77.641,
+    name: "Indiranagar Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Indiranagar & Domlur area",
+  },
+  {
+    lat: 12.917,
+    lng: 77.602,
+    name: "Jayanagar Police Station",
+    type: "police",
+    emoji: "🚔",
+    status: "operational",
+    impactTag: "Safety",
+    impactDescription: "Jayanagar jurisdiction",
+  },
+];
+
+// ─── Petrol Pumps ─────────────────────────────────────────────────────────────
+
+const PETROL_PUMPS: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.047,
+    lng: 77.565,
+    name: "HPCL BEL Road",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "24-hour fuel station on BEL Road",
+  },
+  {
+    lat: 13.038,
+    lng: 77.595,
+    name: "Indian Oil Hebbal Flyover",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "High-traffic fuel point near Hebbal",
+  },
+  {
+    lat: 12.975,
+    lng: 77.612,
+    name: "BPCL MG Road",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "Central city fuel station",
+  },
+  {
+    lat: 12.935,
+    lng: 77.621,
+    name: "Indian Oil Koramangala",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "Koramangala 5th Block fuel",
+  },
+  {
+    lat: 13.018,
+    lng: 77.695,
+    name: "HPCL Whitefield Main",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "Whitefield road fuel station",
+  },
+  {
+    lat: 12.912,
+    lng: 77.546,
+    name: "BPCL JP Nagar",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "JP Nagar 7th Phase fuel",
+  },
+  {
+    lat: 13.014,
+    lng: 77.563,
+    name: "Indian Oil Yeshwanthpur",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "Yeshwanthpur junction fuel",
+  },
+  {
+    lat: 12.985,
+    lng: 77.561,
+    name: "HPCL Rajajinagar",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "Rajajinagar 4th Block fuel point",
+  },
+  {
+    lat: 12.963,
+    lng: 77.639,
+    name: "BPCL Indiranagar 100ft",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "100 Feet Road Indiranagar",
+  },
+  {
+    lat: 12.918,
+    lng: 77.607,
+    name: "Indian Oil Jayanagar",
+    type: "petrol_pump",
+    emoji: "⛽",
+    status: "operational",
+    impactTag: "Fuel",
+    impactDescription: "Jayanagar 4th Block fuel",
+  },
+];
+
+// ─── Pharmacies ───────────────────────────────────────────────────────────────
+
+const PHARMACIES: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.041,
+    lng: 77.568,
+    name: "Apollo Pharmacy BEL Road",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "24-hour Apollo pharmacy",
+  },
+  {
+    lat: 13.037,
+    lng: 77.598,
+    name: "MedPlus Hebbal",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "MedPlus chain — Hebbal main road",
+  },
+  {
+    lat: 12.976,
+    lng: 77.61,
+    name: "Wellness Forever MG Road",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "Central Bangalore pharmacy",
+  },
+  {
+    lat: 12.934,
+    lng: 77.623,
+    name: "Apollo Pharmacy Koramangala",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "Koramangala 6th Block",
+  },
+  {
+    lat: 13.019,
+    lng: 77.693,
+    name: "MedPlus Whitefield",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "ITPL main road pharmacy",
+  },
+  {
+    lat: 12.911,
+    lng: 77.545,
+    name: "Apollo Pharmacy JP Nagar",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "JP Nagar 3rd Phase",
+  },
+  {
+    lat: 12.961,
+    lng: 77.64,
+    name: "MedPlus Indiranagar",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "Indiranagar 12th Main",
+  },
+  {
+    lat: 12.916,
+    lng: 77.601,
+    name: "Wellness Forever Jayanagar",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "Jayanagar Shopping Complex",
+  },
+  {
+    lat: 12.988,
+    lng: 77.562,
+    name: "Apollo Pharmacy Rajajinagar",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "Rajajinagar 1st Block",
+  },
+  {
+    lat: 13.068,
+    lng: 77.647,
+    name: "MedPlus Thanisandra",
+    type: "pharmacy",
+    emoji: "💊",
+    status: "operational",
+    impactTag: "Healthcare",
+    impactDescription: "Thanisandra main road",
+  },
+];
+
+// ─── Supermarkets ─────────────────────────────────────────────────────────────
+
+const SUPERMARKETS: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.043,
+    lng: 77.566,
+    name: "More Supermarket BEL Road",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Daily grocery — BEL Road",
+  },
+  {
+    lat: 13.036,
+    lng: 77.596,
+    name: "Big Bazaar Hebbal",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Hebbal Kempapura retail hub",
+  },
+  {
+    lat: 12.977,
+    lng: 77.609,
+    name: "Reliance Fresh MG Road",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Central Bangalore grocery",
+  },
+  {
+    lat: 12.936,
+    lng: 77.62,
+    name: "Dmart Koramangala",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Value retail — Koramangala",
+  },
+  {
+    lat: 13.017,
+    lng: 77.692,
+    name: "More Supermarket Whitefield",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Whitefield ITPL road grocery",
+  },
+  {
+    lat: 12.913,
+    lng: 77.547,
+    name: "Dmart JP Nagar",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "JP Nagar 24th Main",
+  },
+  {
+    lat: 12.962,
+    lng: 77.638,
+    name: "Reliance Fresh Indiranagar",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Indiranagar CMH Road",
+  },
+  {
+    lat: 12.919,
+    lng: 77.603,
+    name: "Big Bazaar Jayanagar",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Jayanagar 4th T Block mall",
+  },
+  {
+    lat: 12.987,
+    lng: 77.563,
+    name: "More Supermarket Vijayanagar",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Vijayanagar main road",
+  },
+  {
+    lat: 13.066,
+    lng: 77.646,
+    name: "Dmart Thanisandra",
+    type: "supermarket",
+    emoji: "🛒",
+    status: "operational",
+    impactTag: "Essentials",
+    impactDescription: "Thanisandra near Nagavara",
+  },
+];
+
+// ─── Restaurants ─────────────────────────────────────────────────────────────
+
+const RESTAURANTS: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.04,
+    lng: 77.569,
+    name: "Dialogues Café BEL Road",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Popular café near BEL campus",
+  },
+  {
+    lat: 13.034,
+    lng: 77.599,
+    name: "The Egg Factory Hebbal",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Casual dining — Hebbal",
+  },
+  {
+    lat: 12.974,
+    lng: 77.614,
+    name: "Toit Brewery Indiranagar",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Bangalore's famous craft brewery",
+  },
+  {
+    lat: 12.932,
+    lng: 77.622,
+    name: "Social Koramangala",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Popular all-day dining & bar",
+  },
+  {
+    lat: 13.016,
+    lng: 77.69,
+    name: "Stories Whitefield",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Whitefield tech crowd favourite",
+  },
+  {
+    lat: 12.914,
+    lng: 77.548,
+    name: "Meghana Foods JP Nagar",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Biriyani chain — JP Nagar",
+  },
+  {
+    lat: 12.92,
+    lng: 77.6,
+    name: "Brahmin's Coffee Bar Jayanagar",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Iconic Bangalore breakfast spot",
+  },
+  {
+    lat: 12.989,
+    lng: 77.559,
+    name: "Hotel Sapthagiri Rajajinagar",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Vegetarian thali — Rajajinagar",
+  },
+  {
+    lat: 12.964,
+    lng: 77.636,
+    name: "Shivaji Military Hotel Indiranagar",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Naati food institution",
+  },
+  {
+    lat: 13.07,
+    lng: 77.645,
+    name: "Coastal Bay Thanisandra",
+    type: "restaurant",
+    emoji: "🍽️",
+    status: "operational",
+    impactTag: "Dining",
+    impactDescription: "Coastal seafood — north Bangalore",
+  },
+];
+
+// ─── Banks ───────────────────────────────────────────────────────────────────
+
+const BANKS: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.044,
+    lng: 77.567,
+    name: "SBI BEL Road Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "State Bank of India — BEL Road",
+  },
+  {
+    lat: 13.039,
+    lng: 77.596,
+    name: "HDFC Hebbal Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "HDFC main branch — Hebbal",
+  },
+  {
+    lat: 12.979,
+    lng: 77.608,
+    name: "ICICI MG Road Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "ICICI Bank — central Bangalore",
+  },
+  {
+    lat: 12.937,
+    lng: 77.619,
+    name: "Axis Bank Koramangala",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "Axis Bank — Koramangala 5th Block",
+  },
+  {
+    lat: 13.021,
+    lng: 77.691,
+    name: "HDFC Whitefield Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "HDFC Bank — ITPL main road",
+  },
+  {
+    lat: 12.908,
+    lng: 77.549,
+    name: "Canara Bank JP Nagar",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "Canara Bank — JP Nagar 9th Phase",
+  },
+  {
+    lat: 12.965,
+    lng: 77.637,
+    name: "Kotak Indiranagar Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "Kotak Mahindra — 100 Feet Road",
+  },
+  {
+    lat: 12.921,
+    lng: 77.602,
+    name: "HDFC Jayanagar Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "HDFC — Jayanagar 4th Block",
+  },
+  {
+    lat: 12.99,
+    lng: 77.558,
+    name: "SBI Vijayanagar Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "SBI main branch — Vijayanagar",
+  },
+  {
+    lat: 13.067,
+    lng: 77.649,
+    name: "ICICI Thanisandra Branch",
+    type: "bank",
+    emoji: "🏦",
+    status: "operational",
+    impactTag: "Banking",
+    impactDescription: "ICICI Bank — Thanisandra road",
+  },
+];
+
+// ─── ATMs ────────────────────────────────────────────────────────────────────
+
+const ATMS: Omit<InfraPin, "id">[] = [
+  {
+    lat: 13.045,
+    lng: 77.566,
+    name: "SBI ATM BEL Road",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "24-hr SBI ATM — BEL Road",
+  },
+  {
+    lat: 13.04,
+    lng: 77.594,
+    name: "HDFC ATM Hebbal",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "HDFC ATM — Hebbal flyover",
+  },
+  {
+    lat: 12.98,
+    lng: 77.607,
+    name: "ICICI ATM MG Road",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "ICICI ATM — MG Road Metro",
+  },
+  {
+    lat: 12.933,
+    lng: 77.625,
+    name: "Axis ATM Koramangala",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "Axis Bank ATM — Koramangala",
+  },
+  {
+    lat: 13.022,
+    lng: 77.69,
+    name: "HDFC ATM Whitefield",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "HDFC ATM — Whitefield ITPL",
+  },
+  {
+    lat: 12.909,
+    lng: 77.55,
+    name: "Canara ATM JP Nagar",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "Canara Bank ATM — JP Nagar",
+  },
+  {
+    lat: 12.966,
+    lng: 77.635,
+    name: "Kotak ATM Indiranagar",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "Kotak ATM — 12th Main Indiranagar",
+  },
+  {
+    lat: 12.922,
+    lng: 77.6,
+    name: "HDFC ATM Jayanagar",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "HDFC ATM — Jayanagar complex",
+  },
+  {
+    lat: 12.991,
+    lng: 77.557,
+    name: "SBI ATM Vijayanagar",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "SBI ATM — Vijayanagar",
+  },
+  {
+    lat: 13.071,
+    lng: 77.644,
+    name: "ICICI ATM Thanisandra",
+    type: "atm",
+    emoji: "💳",
+    status: "operational",
+    impactTag: "ATM",
+    impactDescription: "ICICI ATM — Thanisandra road",
+  },
+];
+
 // ─── getInfraPins ─────────────────────────────────────────────────────────────
 
 /**
@@ -1449,6 +2191,27 @@ export function getInfraPins(
     case "school":
     case "tech_park":
       return [];
+    case "police":
+      raw = POLICE_STATIONS;
+      break;
+    case "petrol_pump":
+      raw = PETROL_PUMPS;
+      break;
+    case "pharmacy":
+      raw = PHARMACIES;
+      break;
+    case "supermarket":
+      raw = SUPERMARKETS;
+      break;
+    case "restaurant":
+      raw = RESTAURANTS;
+      break;
+    case "bank":
+      raw = BANKS;
+      break;
+    case "atm":
+      raw = ATMS;
+      break;
   }
   return raw.map((p, i) => ({ ...p, id: `${layerType}-${i}` }));
 }
@@ -1616,6 +2379,104 @@ export function getInfraPinsForLayer(
             lng: pin.lng,
             distance: dist,
             emoji: "🛣️",
+          });
+      }
+      break;
+    }
+    case "police": {
+      for (const pin of POLICE_STATIONS) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "🚔",
+          });
+      }
+      break;
+    }
+    case "petrol_pump": {
+      for (const pin of PETROL_PUMPS) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "⛽",
+          });
+      }
+      break;
+    }
+    case "pharmacy": {
+      for (const pin of PHARMACIES) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "💊",
+          });
+      }
+      break;
+    }
+    case "supermarket": {
+      for (const pin of SUPERMARKETS) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "🛒",
+          });
+      }
+      break;
+    }
+    case "restaurant": {
+      for (const pin of RESTAURANTS) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "🍽️",
+          });
+      }
+      break;
+    }
+    case "bank": {
+      for (const pin of BANKS) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "🏦",
+          });
+      }
+      break;
+    }
+    case "atm": {
+      for (const pin of ATMS) {
+        const dist = haversineDistance(refLat, refLng, pin.lat, pin.lng);
+        if (dist <= radiusKm)
+          results.push({
+            name: pin.name,
+            lat: pin.lat,
+            lng: pin.lng,
+            distance: dist,
+            emoji: "💳",
           });
       }
       break;

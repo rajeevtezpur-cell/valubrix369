@@ -86,10 +86,13 @@ export function ConnectivityScoreCard({
 }: Props) {
   const [metros, setMetros] = useState<MetroResult[]>([]);
   useEffect(() => {
+    // Guard: do not fetch with zero or missing coordinates
+    if (!lat || !lng || lat === 0 || lng === 0) return;
+    console.log(`[ConnectivityScore] lat=${lat}, lng=${lng}`);
     // If pre-fetched metros are provided and non-empty, use them directly — no re-fetch
     if (metrosProp && metrosProp.length > 0) {
       setMetros(metrosProp);
-    } else if (lat && lng) {
+    } else {
       getNearestMetros(lat, lng, 1)
         .then(setMetros)
         .catch(() => setMetros([]));
@@ -151,6 +154,15 @@ export function ConnectivityScoreCard({
               bg: "rgba(148,163,184,0.08)",
               border: "rgba(148,163,184,0.2)",
             };
+
+  // Guard: if no real coordinates provided, show "select a location" state
+  if (!lat || !lng || lat === 0 || lng === 0) {
+    return (
+      <div className="rounded-2xl p-6 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 text-white/40 text-sm text-center">
+        Select a location to view connectivity data
+      </div>
+    );
+  }
 
   if (loading) {
     return (

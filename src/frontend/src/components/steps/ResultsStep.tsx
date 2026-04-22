@@ -1181,7 +1181,6 @@ function ScenarioGraph({
   }
 
   return (
-    // biome-ignore lint/a11y/noSvgWithoutTitle: decorative chart SVG
     <svg
       width="100%"
       viewBox={`0 0 ${W} ${H}`}
@@ -1189,6 +1188,7 @@ function ScenarioGraph({
       aria-label={`Scenario forecast graph for ${timeLabel}`}
       style={{ display: "block", overflow: "visible" }}
     >
+      <title>{`Scenario forecast graph for ${timeLabel}`}</title>
       {/* Scenario lines */}
       <path
         d={curve(yNow, yBear)}

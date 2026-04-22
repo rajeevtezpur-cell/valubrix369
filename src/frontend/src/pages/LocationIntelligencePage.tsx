@@ -1633,7 +1633,7 @@ export default function LocationIntelligencePage() {
                   city={mapCity}
                   center={[mapCenter.lat, mapCenter.lng]}
                   height="420px"
-                  showLayerToggle={false}
+                  showLayerToggle={true}
                   onLocationSelect={(lat, lng, name) =>
                     handleLocationChange(lat, lng, name)
                   }

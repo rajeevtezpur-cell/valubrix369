@@ -194,9 +194,23 @@ export const AMENITIES_BY_CATEGORY: Record<AmenityCategory, AmenityDef[]> = {
 
 // ─── Unified Form Data ────────────────────────────────────────────────────────
 
+// ─── Apartment Sub-Type ───────────────────────────────────────────────────────
+
+/** Apartment sub-type — mandatory when propertyType === 'apartment' */
+export type ApartmentSubType = "standalone" | "gated" | "township";
+
+/** Returns true when Apartment Sub-Type selector should be shown */
+export function showApartmentSubTypeFor(
+  type: PropertyType | null | undefined,
+): boolean {
+  return type === "apartment";
+}
+
 export interface PropertyFormData {
   location: LocationData | null;
   propertyType: PropertyType | null;
+  /** Mandatory when propertyType === 'apartment' */
+  apartmentSubType?: ApartmentSubType;
   bhk: BHKOption | null;
   floorRange: FloorPreference | null;
   exactFloor: string;
@@ -219,6 +233,7 @@ export interface PropertyFormData {
 export const EMPTY_FORM_DATA: PropertyFormData = {
   location: null,
   propertyType: null,
+  apartmentSubType: undefined,
   bhk: null,
   floorRange: null,
   exactFloor: "",

@@ -182,4 +182,18 @@ export const mockBackend: backendInterface = {
   updateSubscriptionStatus: async () => true,
   updateUserRole: async () => undefined,
   verifyAndUpgradeFromSession: async () => "ok",
+  approveBankOfficer: async () => true,
+  getAllBankerApps: async () => [],
+  getMyBankerStatus: async () => "approved",
+  getPendingBankers: async () => [],
+  rejectBankOfficer: async () => true,
+  registerBankOfficer: async () => BigInt(1),
+  submitValuation: async () => ({
+    comparablesUsed: BigInt(10), subTypeMultiplier: BigInt(100), pricePerSqft: BigInt(9500),
+    infraContribution: BigInt(500), metroContribution: BigInt(300), locationContribution: BigInt(2000),
+    confidenceReason: "Mock valuation", subTypeApplied: "gated", builderApplied: "unknown",
+    demandContribution: BigInt(800), bestPrice: BigInt(12500000), comparablesContribution: BigInt(5000),
+    priceMax: BigInt(13500000), priceMin: BigInt(11500000), confidence: BigInt(80),
+    localityFound: true, builderMultiplier: BigInt(100),
+  }),
 };

@@ -12,6 +12,13 @@ import {
   southBangaloreVillas,
 } from "../data/southBangaloreTrainingData";
 import type { SouthBangaloreRecord } from "../data/southBangaloreTrainingData";
+import {
+  type PropertyTypeKey,
+  type RegionKey,
+  hasWeights,
+  loadWeights,
+  saveWeights,
+} from "../services/modelWeightsStore";
 import { getNorthBangaloreData } from "./northBangaloreEngine";
 import type { TrainingRecord as NBTrainingRecord } from "./northBangaloreEngine";
 
@@ -12802,4 +12809,136 @@ export function maybeAutoRetrain(): void {
   } catch (_e) {
     // localStorage unavailable — skip
   }
+}
+
+// ─── trainAndCache — Persistent weight training with cache-first logic ─────────────
+//
+// For each property type × region combination:
+//   1. Check modelWeightsStore for valid (non-stale) cached weights.
+//   2. If found: restore in-memory model from cache → skip training.
+//   3. If not found: train on provided records → save weights to store.
+//
+// This ensures inference is <500ms on all subsequent calls after the first
+// requestIdleCallback training pass completes at startup.
+
+/**
+ * Build a locality → median PSF cache from training records for persistence.
+ */
+function buildLocalityPSFCache(
+  dataset: TrainingRecord[],
+): Record<string, number> {
+  const groups: Record<number, number[]> = {};
+  for (const r of dataset) {
+    if (r.pricePerSqft >= 3000) {
+      if (!groups[r.localityIndex]) groups[r.localityIndex] = [];
+      groups[r.localityIndex].push(r.pricePerSqft);
+    }
+  }
+  const result: Record<string, number> = {};
+  for (const [idx, psfs] of Object.entries(groups)) {
+    const sorted = [...psfs].sort((a, b) => a - b);
+    result[idx] = sorted[Math.floor(sorted.length / 2)];
+  }
+  return result;
+}
+
+/**
+ * trainAndCache — train or restore a per-type model, with localStorage persistence.
+ *
+ * @param propertyType  The property type to train for.
+ * @param region        Data region label for the weight key.
+ */
+export function trainAndCache(
+  propertyType: PropertyTypeKey,
+  region: RegionKey,
+): LinearRegressionModel | null {
+  ensureInitialized();
+
+  const typeKey = propertyType === "commercial" ? "commercial" : propertyType;
+  const model = getModelForType(
+    typeKey as "apartment" | "villa" | "plot" | "commercial",
+  );
+  const dataset = getDatasetForType(
+    typeKey as "apartment" | "villa" | "plot" | "commercial",
+  );
+
+  if (!model) return null;
+
+  // ── Cache hit: restore in-memory model from persisted weights ──────────────
+  if (hasWeights(propertyType, "sale", region)) {
+    const cached = loadWeights(propertyType, "sale", region);
+    if (cached) {
+      // Restore weights into in-memory model if they're different
+      const cachedWeights = cached.weights;
+      if (
+        cachedWeights.coefficients.length === model.weights.length &&
+        model.trainedAt < cachedWeights.trainedAt
+      ) {
+        const restoredModel: LinearRegressionModel = {
+          ...model,
+          weights: cachedWeights.coefficients,
+          mae: cachedWeights.mae,
+          rmse: cachedWeights.rmse,
+          trainedAt: cachedWeights.trainedAt,
+          sampleCount: cachedWeights.sampleCount,
+        };
+        setModelForType(
+          typeKey as "apartment" | "villa" | "plot" | "commercial",
+          restoredModel,
+        );
+        return restoredModel;
+      }
+      return model;
+    }
+  }
+
+  // ── Cache miss: persist current trained weights ─────────────────────────────
+  const cleaned = cleanRecords(dataset);
+  const localityPSFCache = buildLocalityPSFCache(cleaned);
+  const builderPremiumCache: Record<string, number> = {};
+
+  // Compute mean for R² calculation
+  const targets = cleaned.map((r) => r.pricePerSqft);
+  const mean =
+    targets.length > 0
+      ? targets.reduce((s, v) => s + v, 0) / targets.length
+      : 0;
+  let ssTot = 0;
+  let ssRes = 0;
+  if (model.weights.length > 0 && cleaned.length > 0) {
+    for (const r of cleaned) {
+      const pred = r.sqft * model.weights[1] + model.weights[0];
+      ssTot += (r.pricePerSqft - mean) ** 2;
+      ssRes += (r.pricePerSqft - pred) ** 2;
+    }
+  }
+  const r2Score = ssTot > 0 ? Math.max(0, 1 - ssRes / ssTot) : 0;
+
+  saveWeights(propertyType, "sale", region, {
+    coefficients: model.weights,
+    intercept: model.weights[0] ?? 0,
+    featureNames: FEATURE_NAMES,
+    r2Score,
+    sampleCount: model.sampleCount,
+    trainedAt: model.trainedAt,
+    mae: model.mae,
+    rmse: model.rmse,
+    localityPSFCache,
+    builderPremiumCache,
+  });
+
+  return model;
+}
+
+/**
+ * Returns all cached locality PSF values from persisted weights for a given
+ * property type × region. Used by localityEngine.getLearnedPSF().
+ */
+export function getCachedLocalityPSF(
+  propertyType: PropertyTypeKey,
+  region: RegionKey,
+): Record<string, number> | null {
+  const cached = loadWeights(propertyType, "sale", region);
+  if (!cached) return null;
+  return cached.weights.localityPSFCache;
 }

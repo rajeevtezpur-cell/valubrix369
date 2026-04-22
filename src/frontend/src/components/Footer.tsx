@@ -262,17 +262,34 @@ export default function Footer() {
           <p className="text-xs" style={{ color: "rgba(185,198,216,0.5)" }}>
             &copy; {year} ValuBrix. India&apos;s Property Intelligence Platform.
           </p>
-          <p className="text-xs" style={{ color: "rgba(185,198,216,0.4)" }}>
-            Built with ❤️ using{" "}
-            <a
-              href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${utm}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white/70 transition-colors underline underline-offset-2"
+          <div className="flex items-center gap-3">
+            <p className="text-xs" style={{ color: "rgba(185,198,216,0.4)" }}>
+              Built with ❤️ using{" "}
+              <a
+                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${utm}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white/70 transition-colors underline underline-offset-2"
+              >
+                caffeine.ai
+              </a>
+            </p>
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: "rgba(212,175,55,0.5)",
+                background: "rgba(212,175,55,0.08)",
+                border: "1px solid rgba(212,175,55,0.2)",
+                borderRadius: 6,
+                padding: "2px 6px",
+                letterSpacing: "0.05em",
+              }}
+              data-ocid="footer.version_badge"
             >
-              caffeine.ai
-            </a>
-          </p>
+              ValuBrix v1.2.0 • Built Apr 22, 2026
+            </span>
+          </div>
         </div>
       </div>
     </footer>

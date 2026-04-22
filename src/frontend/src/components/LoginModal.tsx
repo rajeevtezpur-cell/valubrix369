@@ -77,6 +77,12 @@ function focusBorder(e: React.FocusEvent<HTMLInputElement>) {
 function blurBorder(e: React.FocusEvent<HTMLInputElement>) {
   e.target.style.borderColor = "rgba(255,255,255,0.12)";
 }
+function focusBorderSelect(e: React.FocusEvent<HTMLSelectElement>) {
+  e.target.style.borderColor = "rgba(201,168,76,0.5)";
+}
+function blurBorderSelect(e: React.FocusEvent<HTMLSelectElement>) {
+  e.target.style.borderColor = "rgba(255,255,255,0.12)";
+}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function LoginModal() {
@@ -159,11 +165,27 @@ export default function LoginModal() {
     return () => clearTimeout(t);
   }, [timer, timerActive]);
 
-  // ── Navigation ───────────────────────────────────────────────────────────────
+  // ─── Navigation ───────────────────────────────────────────────────────────────
   const redirectAfterLogin = (
     role: AuthUser["role"],
     portal: "buyer" | "seller" | "banker" | null,
+    bankStatus?: "pending" | "approved" | "rejected",
   ) => {
+    // Banker with pending/rejected status → always go to /banker-pending
+    if (
+      (role === "banker" || role === "bankOfficer") &&
+      bankStatus === "pending"
+    ) {
+      navigate({ to: "/banker-pending" });
+      return;
+    }
+    if (
+      (role === "banker" || role === "bankOfficer") &&
+      bankStatus === "rejected"
+    ) {
+      navigate({ to: "/bank" }); // BankPortalPage shows rejection screen
+      return;
+    }
     const dest = portal ?? roleToPortal(role);
     if (dest === "buyer") navigate({ to: "/buyer" });
     else if (dest === "seller") navigate({ to: "/seller" });
@@ -211,7 +233,11 @@ export default function LoginModal() {
       if (existingUser) {
         login(existingUser);
         closeLoginModal();
-        redirectAfterLogin(existingUser.role, intendedPortal);
+        redirectAfterLogin(
+          existingUser.role,
+          intendedPortal,
+          existingUser.bankOfficerStatus,
+        );
       } else {
         const newUser: AuthUser = {
           username: identifier,
@@ -263,9 +289,45 @@ export default function LoginModal() {
             mobile: profile.mobile || undefined,
             auth_provider: "email",
           };
+
+          // For banker role: check backend status before navigating
+          let bankerStatus: "pending" | "approved" | "rejected" | undefined;
+          if (authUser.role === "banker" || authUser.role === "bankOfficer") {
+            try {
+              const rawStatus = await actor.getMyBankerStatus();
+              bankerStatus =
+                rawStatus === "approved"
+                  ? "approved"
+                  : rawStatus === "rejected"
+                    ? "rejected"
+                    : "pending";
+              authUser.bankOfficerStatus = bankerStatus;
+            } catch {
+              // fallback to localStorage check
+              try {
+                const bankers = JSON.parse(
+                  localStorage.getItem("valubrix_bank_officers") || "[]",
+                );
+                const match = bankers.find(
+                  (b: { email?: string; status: string }) =>
+                    b.email === authUser.email,
+                );
+                if (match) {
+                  bankerStatus = match.status as
+                    | "pending"
+                    | "approved"
+                    | "rejected";
+                  authUser.bankOfficerStatus = bankerStatus;
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+
           login(authUser);
           closeLoginModal();
-          redirectAfterLogin(authUser.role, intendedPortal);
+          redirectAfterLogin(authUser.role, intendedPortal, bankerStatus);
         } else {
           setSiError("Invalid email or password.");
         }
@@ -276,7 +338,11 @@ export default function LoginModal() {
         if (existing) {
           login(existing);
           closeLoginModal();
-          redirectAfterLogin(existing.role, intendedPortal);
+          redirectAfterLogin(
+            existing.role,
+            intendedPortal,
+            existing.bankOfficerStatus,
+          );
         } else {
           setSiError("Invalid email or password.");
         }
@@ -313,6 +379,13 @@ export default function LoginModal() {
       return;
     }
 
+    // Read role/mobile/city written by the CreateAccountForm component
+    const win = window as unknown as Record<string, string>;
+    const signupRole =
+      (win.__signup_role__ as AuthUser["role"]) || intendedPortal || "buyer";
+    const signupMobile = win.__signup_mobile__ || "";
+    const signupCity = win.__signup_city__ || "";
+
     setCaError("");
     setEpLoading(true);
     try {
@@ -329,18 +402,54 @@ export default function LoginModal() {
           const newUser: AuthUser = {
             username: trimEmail,
             fullName: trimName,
-            city: "",
-            role: (intendedPortal as AuthUser["role"]) ?? "buyer",
+            city: signupCity,
+            role: signupRole as AuthUser["role"],
             email: trimEmail,
+            mobile: signupMobile || undefined,
             auth_provider: "email",
+            ...(signupRole === "banker"
+              ? { bankOfficerStatus: "pending" }
+              : {}),
           };
           login(newUser);
-          setCaSuccess("Account created! Redirecting...");
+          // Register banker in admin queue
+          if (signupRole === "banker") {
+            const bankers = JSON.parse(
+              localStorage.getItem("valubrix_bank_officers") || "[]",
+            );
+            bankers.push({
+              id: `banker_${Date.now()}`,
+              name: trimName,
+              orgId: "",
+              designation: "Banker",
+              department: "Banking",
+              employeeId: "",
+              email: trimEmail,
+              mobile: signupMobile,
+              city: signupCity,
+              dateApplied: new Date().toISOString(),
+              status: "pending",
+            });
+            localStorage.setItem(
+              "valubrix_bank_officers",
+              JSON.stringify(bankers),
+            );
+          }
+          setCaSuccess(
+            signupRole === "banker"
+              ? "Account created! Awaiting admin approval..."
+              : "Account created! Redirecting...",
+          );
           setTimeout(() => {
             closeLoginModal();
-            if (intendedPortal)
+            if (signupRole === "banker") {
+              // Navigate directly to the dedicated pending screen
+              navigate({ to: "/banker-pending" });
+            } else if (intendedPortal) {
               redirectAfterLogin(newUser.role, intendedPortal);
-            else openRoleSelect();
+            } else {
+              openRoleSelect();
+            }
           }, 800);
         } else {
           setCaError(
@@ -352,17 +461,52 @@ export default function LoginModal() {
         const newUser: AuthUser = {
           username: trimEmail,
           fullName: trimName,
-          city: "",
-          role: (intendedPortal as AuthUser["role"]) ?? "buyer",
+          city: signupCity,
+          role: signupRole as AuthUser["role"],
           email: trimEmail,
+          mobile: signupMobile || undefined,
           auth_provider: "email",
+          ...(signupRole === "banker" ? { bankOfficerStatus: "pending" } : {}),
         };
         login(newUser);
-        setCaSuccess("Account created! Redirecting...");
+        // Register banker in admin queue
+        if (signupRole === "banker") {
+          const bankers = JSON.parse(
+            localStorage.getItem("valubrix_bank_officers") || "[]",
+          );
+          bankers.push({
+            id: `banker_${Date.now()}`,
+            name: trimName,
+            orgId: "",
+            designation: "Banker",
+            department: "Banking",
+            employeeId: "",
+            email: trimEmail,
+            mobile: signupMobile,
+            city: signupCity,
+            dateApplied: new Date().toISOString(),
+            status: "pending",
+          });
+          localStorage.setItem(
+            "valubrix_bank_officers",
+            JSON.stringify(bankers),
+          );
+        }
+        setCaSuccess(
+          signupRole === "banker"
+            ? "Account created! Awaiting admin approval..."
+            : "Account created! Redirecting...",
+        );
         setTimeout(() => {
           closeLoginModal();
-          if (intendedPortal) redirectAfterLogin(newUser.role, intendedPortal);
-          else openRoleSelect();
+          if (signupRole === "banker") {
+            // Navigate directly to the dedicated pending screen
+            navigate({ to: "/banker-pending" });
+          } else if (intendedPortal) {
+            redirectAfterLogin(newUser.role, intendedPortal);
+          } else {
+            openRoleSelect();
+          }
         }, 800);
       }
     } catch {
@@ -1103,6 +1247,64 @@ function SignInForm({
 }
 
 // ─── Create Account Form ──────────────────────────────────────────────────────
+const SIGNUP_ROLE_CONFIG: {
+  id: "buyer" | "seller" | "banker";
+  label: string;
+  emoji: string;
+  gradient: string;
+}[] = [
+  {
+    id: "buyer",
+    label: "Buyer",
+    emoji: "🏡",
+    gradient: "linear-gradient(135deg, #D4AF37, #F6D77A)",
+  },
+  {
+    id: "seller",
+    label: "Seller",
+    emoji: "🏢",
+    gradient: "linear-gradient(135deg, #10B981, #34D399)",
+  },
+  {
+    id: "banker",
+    label: "Banker",
+    emoji: "🏦",
+    gradient: "linear-gradient(135deg, #3B82F6, #60A5FA)",
+  },
+];
+
+const CITY_LIST = [
+  "Bangalore",
+  "Mumbai",
+  "Pune",
+  "Hyderabad",
+  "Chennai",
+  "Delhi",
+  "Others",
+];
+const SERVICE_LIST = [
+  "Buy Property",
+  "Sell Property",
+  "Rent Property",
+  "Lease Commercial",
+  "Property Valuation",
+  "Investment Advisory",
+];
+
+const selectStyle: React.CSSProperties = {
+  width: "100%",
+  background: "rgba(17,24,39,0.95)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 12,
+  padding: "13px 16px",
+  color: "white",
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box",
+  appearance: "none",
+  WebkitAppearance: "none",
+};
+
 function CreateAccountForm({
   name,
   setName,
@@ -1132,9 +1334,18 @@ function CreateAccountForm({
   inputRef: React.RefObject<HTMLInputElement | null>;
   onSubmit: () => void;
 }) {
+  const [mobile, setMobile] = useState("");
+  const [city, setCity] = useState("");
+  const [role, setRole] = useState<"buyer" | "seller" | "banker">("buyer");
+  const [serviceInterest, setServiceInterest] = useState("");
+
+  // Expose role/mobile/city to parent via a ref-based approach
+  // We attach them to the input so the parent handler can read via DOM or closure
+  // Instead, we use a hidden div with data attributes that the parent can parse
   return (
     <>
-      <div style={{ marginBottom: 12 }}>
+      {/* Full Name */}
+      <div style={{ marginBottom: 10 }}>
         <label htmlFor="ep-ca-name" style={labelStyle}>
           Full Name
         </label>
@@ -1151,7 +1362,32 @@ function CreateAccountForm({
           onBlur={blurBorder}
         />
       </div>
-      <div style={{ marginBottom: 12 }}>
+
+      {/* Mobile Number */}
+      <div style={{ marginBottom: 10 }}>
+        <label htmlFor="ep-ca-mobile" style={labelStyle}>
+          Mobile Number
+        </label>
+        <input
+          id="ep-ca-mobile"
+          data-ocid="login.ep.signup.mobile.input"
+          type="tel"
+          value={mobile}
+          onChange={(e) => {
+            setMobile(e.target.value);
+            // Store in a shared spot so parent handleCreateAccount can access
+            (window as unknown as Record<string, string>).__signup_mobile__ =
+              e.target.value;
+          }}
+          placeholder="+91 98765 43210"
+          style={inputStyle}
+          onFocus={focusBorder}
+          onBlur={blurBorder}
+        />
+      </div>
+
+      {/* Email */}
+      <div style={{ marginBottom: 10 }}>
         <label htmlFor="ep-ca-email" style={labelStyle}>
           Email Address
         </label>
@@ -1167,7 +1403,160 @@ function CreateAccountForm({
           onBlur={blurBorder}
         />
       </div>
-      <div style={{ marginBottom: 12 }}>
+
+      {/* City */}
+      <div style={{ marginBottom: 10 }}>
+        <label htmlFor="ep-ca-city" style={labelStyle}>
+          City
+        </label>
+        <div style={{ position: "relative" }}>
+          <select
+            id="ep-ca-city"
+            data-ocid="login.ep.signup.city.select"
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value);
+              (window as unknown as Record<string, string>).__signup_city__ =
+                e.target.value;
+            }}
+            style={selectStyle}
+            onFocus={focusBorderSelect}
+            onBlur={blurBorderSelect}
+          >
+            <option value="" style={{ background: "#111827" }}>
+              Select city
+            </option>
+            {CITY_LIST.map((c) => (
+              <option key={c} value={c} style={{ background: "#111827" }}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <span
+            style={{
+              position: "absolute",
+              right: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 11,
+              pointerEvents: "none",
+            }}
+          >
+            ▼
+          </span>
+        </div>
+      </div>
+
+      {/* Role selection */}
+      <div style={{ marginBottom: 10 }}>
+        <p style={{ ...labelStyle, marginBottom: 8 }}>
+          Role <span style={{ color: "#D4AF37" }}>*</span>
+        </p>
+        <div
+          style={{ display: "flex", gap: 8 }}
+          data-ocid="login.ep.signup.role.group"
+        >
+          {SIGNUP_ROLE_CONFIG.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              data-ocid={`login.ep.signup.role.${r.id}.button`}
+              onClick={() => {
+                setRole(r.id);
+                (window as unknown as Record<string, string>).__signup_role__ =
+                  r.id;
+              }}
+              style={{
+                flex: 1,
+                padding: "10px 4px",
+                borderRadius: 12,
+                border:
+                  role === r.id
+                    ? "1.5px solid rgba(255,255,255,0.4)"
+                    : "1.5px solid rgba(255,255,255,0.1)",
+                background:
+                  role === r.id ? r.gradient : "rgba(255,255,255,0.03)",
+                color:
+                  role === r.id
+                    ? r.id === "buyer"
+                      ? "#1a1a1a"
+                      : "white"
+                    : "rgba(255,255,255,0.5)",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{r.emoji}</span>
+              <span>{r.label}</span>
+            </button>
+          ))}
+        </div>
+        {role === "banker" && (
+          <p
+            style={{
+              color: "rgba(251,191,36,0.8)",
+              fontSize: 11,
+              marginTop: 6,
+              textAlign: "center",
+            }}
+          >
+            ⏳ Banker accounts require admin approval
+          </p>
+        )}
+      </div>
+
+      {/* Service Interest */}
+      <div style={{ marginBottom: 10 }}>
+        <label htmlFor="ep-ca-service" style={labelStyle}>
+          Service Interest{" "}
+          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>
+            (optional)
+          </span>
+        </label>
+        <div style={{ position: "relative" }}>
+          <select
+            id="ep-ca-service"
+            data-ocid="login.ep.signup.service.select"
+            value={serviceInterest}
+            onChange={(e) => setServiceInterest(e.target.value)}
+            style={selectStyle}
+            onFocus={focusBorderSelect}
+            onBlur={blurBorderSelect}
+          >
+            <option value="" style={{ background: "#111827" }}>
+              Select service
+            </option>
+            {SERVICE_LIST.map((s) => (
+              <option key={s} value={s} style={{ background: "#111827" }}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <span
+            style={{
+              position: "absolute",
+              right: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 11,
+              pointerEvents: "none",
+            }}
+          >
+            ▼
+          </span>
+        </div>
+      </div>
+
+      {/* Password */}
+      <div style={{ marginBottom: 10 }}>
         <label htmlFor="ep-ca-password" style={labelStyle}>
           Password{" "}
           <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>
